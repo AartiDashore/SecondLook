@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #e5e5ea; display: flex; justify-content: center; padding: 40px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .phone {
+    width: 380px; background: #fff; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .status-bar { background: #f6f6f6; padding: 10px 16px; font-size: 12px; color: #333; display: flex; justify-content: space-between; }
+  .header { background: #f6f6f6; padding: 8px 16px 12px; text-align: center; border-bottom: 1px solid #ddd; }
+  .header .sender { font-weight: 600; font-size: 15px; }
+  .header .sub { font-size: 11px; color: #888; }
+  .messages { padding: 20px 14px; background: #fff; min-height: 200px; }
+  .bubble {
+    background: #e9e9eb; color: #111; padding: 12px 14px; border-radius: 18px;
+    font-size: 15px; line-height: 1.4; max-width: 90%; margin-bottom: 8px;
+  }
+  .time { font-size: 11px; color: #999; text-align: center; margin: 10px 0; }
+  .link { color: #0066cc; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="status-bar"><span>2:14 PM</span><span>🔋 84%</span></div>
+    <div class="header">
+      <div class="sender">SwiftParcel Delivery</div>
+      <div class="sub">+1 (929) 555-0142</div>
+    </div>
+    <div class="messages">
+      <div class="time">Today 2:13 PM</div>
+      <div class="bubble">
+        SwiftParcel: We attempted delivery of your package but could not complete it due to an unpaid customs fee of $2.99. Your parcel will be returned to sender within 12 hours if not resolved.<br><br>
+        Pay now to reschedule: <span class="link">swiftparcel-redelivery.tinyurl.com/pkg44921</span><br><br>
+        Install our tracking app for real-time updates and faster delivery confirmation.
+      </div>
+    </div>
+  </div>
+</body>
+</html>
