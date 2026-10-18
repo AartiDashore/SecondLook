@@ -19,7 +19,7 @@ lists the cyber-crime reporting contacts for your country.
 Original project: https://github.com/propcgamer20-png/tellsign
 
 ### Features
-- **Text and screenshot scanning.** Screenshots are read with a vision model on Groq.
+- **Text and screenshot scanning.** Screenshots are read with Claude's vision.
 - **Plain-language verdict** (likely scam / suspicious / looks safe) with the red-flag phrases quoted.
 - **Rule engine + LLM.** A set of explicit signal rules (urgency, OTP/PIN requests, shortened links,
   app-install pushes, prize and job-offer bait, ...) feeds hints into the model's own judgment
@@ -30,19 +30,19 @@ Original project: https://github.com/propcgamer20-png/tellsign
 - **Reliability fallback** between models if the primary one fails.
 
 ### Stack
-FastAPI (Python), Groq API (`openai/gpt-oss-120b` primary, `openai/gpt-oss-20b` fallback,
-`qwen/qwen3.8-27b` for images), Supabase for the scan log, plain HTML/CSS/JS front end, deployed on Vercel.
+FastAPI (Python), Claude API (`claude-opus-5-5` primary, `claude-sonnet-5-5` fallback, both read screenshots),
+Supabase for the scan log, plain HTML/CSS/JS front end, deployed on Vercel.
 
 ## Setup
 
 1. Create a Supabase project and run `supabase/schema.sql` in its SQL Editor.
-2. Copy `.env.example` to `.env` and fill in `GROQ_API_KEY`, `SUPABASE_URL` and `SUPABASE_KEY`
+2. Copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY` (from console.anthropic.com), `SUPABASE_URL` and `SUPABASE_KEY`
    (use the server-side `service_role` key; it never reaches the browser).
 
 ## Run it locally
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install fastapi groq requests python-dotenv python-multipart uvicorn
+pip install fastapi anthropic requests python-dotenv python-multipart uvicorn
 uvicorn app:app --reload
 ```
 Then open http://127.0.0.1:8000 (Second Look) and http://127.0.0.1:8000/tellsign (Tellsign).

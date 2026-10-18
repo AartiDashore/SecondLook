@@ -4,32 +4,34 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+import anthropic
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-from groq import Groq
 
 from signals import detect_signals, contains_link, requests_install
 
 load_dotenv()
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-PRIMARY_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
-FALLBACK_MODEL = os.environ.get("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b")
-VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
+PRIMARY_MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+FALLBACK_MODEL = os.environ.get("CLAUDE_FALLBACK_MODEL", "claude-sonnet-5-5")
+# Server-side refusal fallback: if a model's safety classifier declines a request,
+# the API re-runs it on Anthropic's recommended fallback model inside the same call.
+REFUSAL_FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-client = Groq(api_key=GROQ_API_KEY)
+# Reads ANTHROPIC_API_KEY from the environment. Short timeout and one retry keep a
+# slow call well inside Vercel's function time limit; the rule engine covers failures.
+client = anthropic.Anthropic(timeout=60.0, max_retries=1)
 
 app = FastAPI()
 
-# Languages gpt-oss-120b / llama-3.3-70b reliably read, understand, and write in -
-# trimmed to only the highest-resource languages these open-weight models handle
-# well, not every language they can technically attempt.
+# Languages offered in the UI - trimmed to high-resource languages the model
+# reads, understands, and writes reliably.
 SUPPORTED_LANGUAGES = [
     "English", "Hindi", "Bengali", "Tamil", "Telugu", "Marathi",
     "Spanish", "French", "German", "Portuguese", "Arabic",
@@ -73,6 +75,37 @@ multiple, or severe manipulation tactics.
 
 READING LEVEL "simple" means: very short sentences, everyday words, no jargon, written for someone who is new \
 to smartphones or not fluent in reading long text. READING LEVEL "normal" means ordinary plain language."""
+
+# JSON schema enforced on the scan response (structured outputs), matching the shape above.
+_STR = {"type": "string"}
+SCAN_RESULT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {"type": "string", "enum": ["safe", "caution", "danger"]},
+        "verdict_label": _STR,
+        "summary": _STR,
+        "recommended_action": _STR,
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"tag": _STR, "quote": _STR, "explain": _STR},
+                "required": ["tag", "quote", "explain"],
+                "additionalProperties": False,
+            },
+        },
+        "safety_lines": {
+            "type": "object",
+            "properties": {k: _STR for k in ("never_share", "no_click", "no_install", "verify_official")},
+            "required": ["never_share", "no_click", "no_install", "verify_official"],
+            "additionalProperties": False,
+        },
+    },
+    "required": ["verdict", "verdict_label", "summary", "recommended_action", "findings", "safety_lines"],
+    "additionalProperties": False,
+}
+
+SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 
 # ---------------------------------------------------------------------------
@@ -161,21 +194,46 @@ def rule_only_result(signals: list) -> dict:
     }
 
 
-def call_groq_text(message_text: str, signals: list, language: str = "English", reading_level: str = "normal") -> dict:
+def ask_claude(model: str, messages: list, effort: str, system: str | None = None, schema: dict | None = None) -> str:
+    """One Messages API call; returns the final text. Raises on errors and refusals."""
+    output_config = {"effort": effort}
+    if schema:
+        output_config["format"] = {"type": "json_schema", "schema": schema}
+    extra = {"system": system} if system else {}
+    response = client.beta.messages.create(
+        model=model,
+        max_tokens=16000,
+        messages=messages,
+        output_config=output_config,
+        betas=[REFUSAL_FALLBACK_BETA],
+        fallbacks="default",
+        **extra,
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError(f"{model} declined the request")
+    # Keep only text written after the last model switch, if a fallback ran.
+    parts = []
+    for block in response.content:
+        if block.type == "fallback":
+            parts = []
+        elif block.type == "text":
+            parts.append(block.text)
+    return "".join(parts).strip()
+
+
+def call_claude_text(message_text: str, signals: list, language: str = "English", reading_level: str = "normal") -> dict:
     user_content = build_user_content(message_text, signals, language, reading_level)
     last_error = None
     for model in (PRIMARY_MODEL, FALLBACK_MODEL):
         try:
-            completion = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_content},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.2,
+            raw = ask_claude(
+                model,
+                [{"role": "user", "content": user_content}],
+                effort="medium",
+                system=SYSTEM_PROMPT,
+                schema=SCAN_RESULT_SCHEMA,
             )
-            data = stripped_json(completion.choices[0].message.content)
+            data = stripped_json(raw)
             data["_model_used"] = model
             data["_degraded"] = False
             return data
@@ -187,30 +245,39 @@ def call_groq_text(message_text: str, signals: list, language: str = "English", 
     return result
 
 
+class UnsupportedImageError(ValueError):
+    pass
+
+
 def ocr_image(data_url: str) -> str:
-    """Reads text out of a screenshot using Groq's vision model directly, instead
-    of a local Tesseract binary - Tesseract needs an OS-level install that a
-    serverless deployment target doesn't have, so this reads the image the same
-    way a person would: by actually looking at it."""
-    completion = client.chat.completions.create(
-        model=VISION_MODEL,
-        messages=[
+    """Reads text out of a screenshot with Claude's vision, instead of a local
+    Tesseract binary - Tesseract needs an OS-level install that a serverless
+    deployment target doesn't have, so this reads the image the same way a person
+    would: by actually looking at it."""
+    header, _, b64_data = data_url.partition(",")
+    media_type = header.removeprefix("data:").split(";")[0].lower()
+    if not header.startswith("data:") or ";base64" not in header or not b64_data:
+        raise UnsupportedImageError("The upload is not a valid image.")
+    if media_type not in SUPPORTED_IMAGE_TYPES:
+        raise UnsupportedImageError("Please upload a PNG, JPG, GIF, or WebP screenshot.")
+    return ask_claude(
+        PRIMARY_MODEL,
+        [
             {
                 "role": "user",
                 "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": b64_data}},
                     {
                         "type": "text",
                         "text": "Extract all readable text from this image, verbatim, preserving line "
                         "breaks where they appear. Return ONLY the extracted text, nothing else, "
                         "no commentary.",
                     },
-                    {"type": "image_url", "image_url": {"url": data_url}},
                 ],
             }
         ],
-        temperature=0.0,
+        effort="low",
     )
-    return (completion.choices[0].message.content or "").strip()
 
 
 def log_scan(input_type, snippet, result, model_used, language, degraded) -> int:
@@ -260,7 +327,7 @@ class ImageScanRequest(BaseModel):
 
 def finalize_scan(input_type: str, message_text: str, language: str, reading_level: str):
     signals = detect_signals(message_text)
-    result = call_groq_text(message_text, signals, language, reading_level)
+    result = call_claude_text(message_text, signals, language, reading_level)
 
     model_used = result.pop("_model_used", PRIMARY_MODEL)
     degraded = result.pop("_degraded", False)
@@ -297,6 +364,8 @@ async def scan_text(req: TextScanRequest):
 async def scan_image(req: ImageScanRequest):
     try:
         message_text = ocr_image(req.image)
+    except UnsupportedImageError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
     except Exception as e:
         return JSONResponse(
             {"error": f"Could not read text from the screenshot. Details: {e}"},
@@ -396,13 +465,14 @@ async def ui_strings(lang: str = "English"):
             "including any {n} placeholders exactly as they are. Return ONLY a JSON object with the same "
             "keys and translated values, no markdown fences, no commentary.\n\n" + json.dumps(UI_STRINGS_EN)
         )
-        completion = client.chat.completions.create(
-            model=PRIMARY_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.1,
-        )
-        translated = stripped_json(completion.choices[0].message.content)
+        schema = {
+            "type": "object",
+            "properties": {k: {"type": "string"} for k in UI_STRINGS_EN},
+            "required": list(UI_STRINGS_EN),
+            "additionalProperties": False,
+        }
+        raw = ask_claude(PRIMARY_MODEL, [{"role": "user", "content": prompt}], effort="low", schema=schema)
+        translated = stripped_json(raw)
         for k, v in UI_STRINGS_EN.items():
             translated.setdefault(k, v)
         TRANSLATION_CACHE[key] = translated
