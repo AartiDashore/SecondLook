@@ -42,7 +42,7 @@ SUPPORTED_LANGUAGES = [
     "Chinese (Simplified)", "Russian",
 ]
 
-SYSTEM_PROMPT = """You are the detection engine inside Tellsign, a tool that helps ordinary people tell whether a message they received is a scam.
+SYSTEM_PROMPT = """You are the detection engine inside SecondScan, a tool that helps ordinary people tell whether a message they received is a scam.
 
 You will be given one message (an SMS, email, WhatsApp text, or call transcript). A rule engine has already \
 flagged some pattern matches in it - use those as hints, not gospel: confirm, downgrade, or add to them based \
@@ -500,9 +500,9 @@ async def get_languages():
 
 BASE_DIR = Path(__file__).parent
 SECOND_LOOK_PATH = BASE_DIR / "prototype.html"
-TELLSIGN_PATH = BASE_DIR / "tellsign.html"
+SECONDSCAN_PATH = BASE_DIR / "secondscan.html"
 
-# Tellsign's stylesheet and script (static/tellsign.css, static/tellsign.js).
+# SecondScan's stylesheet and script (static/secondscan.css, static/secondscan.js).
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
@@ -511,6 +511,6 @@ async def index():
     return SECOND_LOOK_PATH.read_text(encoding="utf-8")
 
 
-@app.get("/tellsign", response_class=HTMLResponse)
-async def tellsign():
-    return TELLSIGN_PATH.read_text(encoding="utf-8")
+@app.get("/secondscan", response_class=HTMLResponse)
+async def secondscan():
+    return SECONDSCAN_PATH.read_text(encoding="utf-8")

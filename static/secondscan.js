@@ -182,8 +182,8 @@ const LANG_TO_BCP47 = {
   'Chinese (Simplified)': 'zh-CN', 'Russian': 'ru-RU',
 };
 
-let currentLanguage = localStorage.getItem('tellsign_lang') || 'English';
-let simpleMode = localStorage.getItem('tellsign_simple') === 'true';
+let currentLanguage = localStorage.getItem('secondscan_lang') || 'English';
+let simpleMode = localStorage.getItem('secondscan_simple') === 'true';
 let uiStrings = {};
 let lastScanForSpeech = null;
 
@@ -239,14 +239,14 @@ function applyUiStrings(){
 
 langSelect.addEventListener('change', () => {
   currentLanguage = langSelect.value;
-  localStorage.setItem('tellsign_lang', currentLanguage);
+  localStorage.setItem('secondscan_lang', currentLanguage);
   loadUiStrings(currentLanguage);
 });
 
 simpleModeToggle.checked = simpleMode;
 simpleModeToggle.addEventListener('change', () => {
   simpleMode = simpleModeToggle.checked;
-  localStorage.setItem('tellsign_simple', simpleMode);
+  localStorage.setItem('secondscan_simple', simpleMode);
 });
 
 async function loadStats(){
