@@ -83,27 +83,6 @@ h1{
 .intro h1{ font-size:clamp(28px, 4.4vw, 36px); max-width:none; margin:0 0 12px; }
 .intro .sub{ font-size:15.5px; max-width:60ch; }
 
-.stat-band{
-  display:grid; grid-template-columns:1fr; margin:0 0 10px;
-  border-top:1px solid rgba(255,255,255,0.16); border-bottom:1px solid rgba(255,255,255,0.16);
-}
-.stat{ padding:9px 0; }
-.stat + .stat{ border-top:1px solid rgba(255,255,255,0.1); }
-@media (min-width: 600px){
-  .stat-band{ grid-template-columns:repeat(3, 1fr); }
-  .stat{ padding:13px 16px; }
-  .stat:first-child{ padding-left:0; }
-  .stat:last-child{ padding-right:0; }
-  .stat + .stat{ border-top:none; border-left:1px solid rgba(255,255,255,0.12); }
-}
-.stat-num{
-  font-family:'Fraunces', serif; font-weight:600;
-  font-size:clamp(17px, 2.3vw, 20px); color:var(--gold);
-  line-height:1.1; margin:0 0 3px;
-}
-.stat-label{ font-size:11.5px; color:rgba(255,255,255,0.76); line-height:1.4; margin:0; }
-.stat-source{ font-size:11.5px; color:rgba(255,255,255,0.5); margin:12px 0 44px; }
-
 .console{
   background:linear-gradient(155deg, rgba(90,170,255,0.16) 0%, rgba(10,52,96,0.42) 100%);
   border:1px solid rgba(150,205,255,0.28);
