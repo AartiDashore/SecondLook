@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -132,6 +133,11 @@ CONFIDENCE_ANCHORS = (
     (float(STOP_RISK_THRESHOLD), 39.0),
     (float(MAX_POSSIBLE_RISK_SCORE), 0.0),
 )
+RISK_RULE_PRIORITY = {rule_id: index for index, rule_id in enumerate(RISK_RULES)}
+
+
+class TransactionNotFoundError(LookupError):
+    """Raised when a member/payment pair does not exist in the scored events."""
 
 
 def normalize_risk_score(raw_risk_score: Any, max_possible_risk_score: Any = MAX_POSSIBLE_RISK_SCORE) -> tuple[float, float]:
@@ -180,6 +186,60 @@ def make_api_response(scored_payment: dict[str, Any] | pd.Series) -> dict[str, A
     }
 
 
+def rank_positive_risk_factors(
+    risk_factors: list[dict[str, Any]],
+    limit: int = 3,
+) -> list[dict[str, str]]:
+    """Return public factor details ranked by contribution and rule priority."""
+    positive_factors = [
+        factor
+        for factor in risk_factors
+        if _finite_number(factor.get("contribution"), default=0.0) > 0
+    ]
+    ranked = sorted(
+        positive_factors,
+        key=lambda factor: (
+            -_finite_number(factor.get("contribution"), default=0.0),
+            RISK_RULE_PRIORITY.get(str(factor.get("id")), len(RISK_RULE_PRIORITY)),
+            str(factor.get("id", "")),
+        ),
+    )
+    return [
+        {
+            "id": str(factor["id"]),
+            "title": str(factor["title"]),
+            "description": str(factor["explanation"]),
+        }
+        for factor in ranked[: max(0, limit)]
+    ]
+
+
+def get_transaction_confidence(
+    member_id: str,
+    payment_id: str,
+    events_path: Path | str = DEFAULT_EVENTS_PATH,
+) -> dict[str, Any]:
+    """Return the mobile-safe confidence response for one member payment."""
+    resolved_path = Path(events_path).resolve()
+    scored = _cached_scored_payments(str(resolved_path), resolved_path.stat().st_mtime_ns)
+    matches = scored[
+        scored["member_id"].eq(member_id)
+        & scored["payment_id"].eq(payment_id)
+    ]
+    if matches.empty:
+        raise TransactionNotFoundError(
+            f"No initiated payment {payment_id!r} was found for member {member_id!r}."
+        )
+    payment = matches.iloc[0]
+    return {
+        "member_id": str(payment["member_id"]),
+        "payment_id": str(payment["payment_id"]),
+        "confidence_percentage": int(payment["confidence_percentage"]),
+        "risk_tier": str(payment["risk_tier"]),
+        "top_risk_factors": rank_positive_risk_factors(payment["risk_factors"]),
+    }
+
+
 def score_events(events: pd.DataFrame) -> pd.DataFrame:
     """Score every Payment Initiated event without using outcome-label columns."""
     required = {
@@ -223,6 +283,12 @@ def load_and_score(events_path: Path | str = DEFAULT_EVENTS_PATH) -> pd.DataFram
     """Load the event CSV and score all initiated payments."""
     events = pd.read_csv(events_path, parse_dates=["event_timestamp"])
     return score_events(events)
+
+
+@lru_cache(maxsize=4)
+def _cached_scored_payments(events_path: str, modified_time_ns: int) -> pd.DataFrame:
+    del modified_time_ns
+    return load_and_score(events_path)
 
 
 def _score_payment(member_id: Any, member_events: pd.DataFrame, payment: pd.Series) -> dict[str, Any]:

@@ -13,10 +13,13 @@ sys.path.insert(0, str(ANALYSIS_DIR))
 
 from score_all_members import (  # noqa: E402
     MAX_POSSIBLE_RISK_SCORE,
+    TransactionNotFoundError,
     assign_risk_tier,
     calculate_max_possible_risk_score,
+    get_transaction_confidence,
     make_api_response,
     normalize_risk_score,
+    rank_positive_risk_factors,
     score_events,
 )
 
@@ -177,6 +180,108 @@ class ScoringTests(unittest.TestCase):
         for score, account_takeover, expected in cases:
             with self.subTest(score=score, account_takeover=account_takeover):
                 self.assertEqual(assign_risk_tier(score, account_takeover), expected)
+
+
+class MobileConfidenceTests(unittest.TestCase):
+    def test_m1002_selected_wire_returns_expected_public_response(self):
+        response = get_transaction_confidence("M1002", "P1002-012")
+
+        self.assertEqual(response["member_id"], "M1002")
+        self.assertEqual(response["payment_id"], "P1002-012")
+        self.assertEqual(response["confidence_percentage"], 33)
+        self.assertEqual(response["risk_tier"], "Pause")
+        self.assertEqual(
+            [factor["id"] for factor in response["top_risk_factors"]],
+            ["new_recipient", "cumulative_recipient_total", "increasing_payments"],
+        )
+
+    def test_public_response_exposes_no_internal_scoring_values(self):
+        response = get_transaction_confidence("M1002", "P1002-012")
+
+        self.assertEqual(
+            set(response),
+            {
+                "member_id",
+                "payment_id",
+                "confidence_percentage",
+                "risk_tier",
+                "top_risk_factors",
+            },
+        )
+        for factor in response["top_risk_factors"]:
+            self.assertEqual(set(factor), {"id", "title", "description"})
+            self.assertNotIn("contribution", factor)
+
+    def test_factor_ranking_uses_points_then_fixed_rule_priority(self):
+        factors = [
+            {
+                "id": "previous_warning",
+                "title": "Previous warning",
+                "explanation": "A previous warning was shown.",
+                "contribution": 15,
+            },
+            {
+                "id": "increasing_payments",
+                "title": "Increasing payments",
+                "explanation": "Payments increased.",
+                "contribution": 15,
+            },
+            {
+                "id": "new_recipient",
+                "title": "New recipient",
+                "explanation": "The recipient is new.",
+                "contribution": 20,
+            },
+            {
+                "id": "established_recipient",
+                "title": "Established recipient",
+                "explanation": "The recipient is established.",
+                "contribution": -20,
+            },
+        ]
+
+        ranked = rank_positive_risk_factors(factors)
+
+        self.assertEqual(
+            [factor["id"] for factor in ranked],
+            ["new_recipient", "increasing_payments", "previous_warning"],
+        )
+
+    def test_fewer_than_three_positive_factors_are_not_padded(self):
+        one_factor = get_transaction_confidence("M1002", "P1002-006")
+        protective_only = get_transaction_confidence("M1002", "P1002-001")
+
+        self.assertEqual(
+            [factor["id"] for factor in one_factor["top_risk_factors"]],
+            ["new_recipient"],
+        )
+        self.assertEqual(protective_only["top_risk_factors"], [])
+
+    def test_m1002_transactions_can_have_different_results(self):
+        early_p2p = get_transaction_confidence("M1002", "P1002-006")
+        later_wire = get_transaction_confidence("M1002", "P1002-012")
+
+        self.assertNotEqual(
+            early_p2p["confidence_percentage"],
+            later_wire["confidence_percentage"],
+        )
+        self.assertNotEqual(early_p2p["risk_tier"], later_wire["risk_tier"])
+
+    def test_public_response_is_json_serializable_and_bounded(self):
+        import json
+
+        response = get_transaction_confidence("M1002", "P1002-012")
+        encoded = json.dumps(response)
+
+        self.assertIsInstance(encoded, str)
+        self.assertIsInstance(response["confidence_percentage"], int)
+        self.assertGreaterEqual(response["confidence_percentage"], 0)
+        self.assertLessEqual(response["confidence_percentage"], 100)
+        self.assertLessEqual(len(response["top_risk_factors"]), 3)
+
+    def test_missing_member_payment_pair_raises_lookup_error(self):
+        with self.assertRaises(TransactionNotFoundError):
+            get_transaction_confidence("M1002", "NOT-A-PAYMENT")
 
 
 if __name__ == "__main__":
