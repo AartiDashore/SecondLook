@@ -95,6 +95,11 @@ function applyUiStrings(){
   document.querySelector('[data-ex="delivery"]').textContent = t('ex_delivery', 'Try: delivery link');
   document.querySelector('[data-ex="job"]').textContent = t('ex_job', 'Try: job offer');
   document.querySelector('[data-ex="safe"]').textContent = t('ex_safe', 'Try: a normal text');
+  tabPhoneBtn.textContent = t('tab_phone', 'Phone number scan');
+  phoneInput.placeholder = t('placeholder_phone', 'Phone number, e.g. (206) 555-0123');
+  phoneContext.placeholder = t('placeholder_phone_context', 'Optional: what did they say or ask for?');
+  scanPhoneBtn.textContent = t('scan_phone_btn', 'Scan number');
+  document.getElementById('phoneHint').textContent = t('phone_hint', "US numbers work without +1. For other countries, start with + and the country code. The number's owner is never contacted.");
   loadHistory();
   loadStats();
 }
@@ -153,24 +158,34 @@ const imagePreviewWrap = document.getElementById('imagePreviewWrap');
 const imagePreview = document.getElementById('imagePreview');
 const clearImageBtn = document.getElementById('clearImageBtn');
 const scanImageBtn = document.getElementById('scanImageBtn');
+const tabPhoneBtn = document.getElementById('tabPhoneBtn');
+const tabPhonePanel = document.getElementById('tabPhonePanel');
+const phoneInput = document.getElementById('phoneInput');
+const phoneContext = document.getElementById('phoneContext');
+const scanPhoneBtn = document.getElementById('scanPhoneBtn');
+const phoneDetails = document.getElementById('phoneDetails');
 
 let currentImageBase64 = null;
 let currentScanId = null;
 
-tabTextBtn.addEventListener('click', () => {
-  tabTextBtn.classList.add('active');
-  tabImageBtn.classList.remove('active');
-  tabTextPanel.classList.add('active');
-  tabImagePanel.classList.remove('active');
+const TABS = {
+  text: [tabTextBtn, tabTextPanel],
+  image: [tabImageBtn, tabImagePanel],
+  phone: [tabPhoneBtn, tabPhonePanel],
+};
+let activeTab = 'text';
+
+function showTab(name){
+  activeTab = name;
+  Object.entries(TABS).forEach(([key, [btn, panel]]) => {
+    btn.classList.toggle('active', key === name);
+    panel.classList.toggle('active', key === name);
+  });
   result.classList.remove('active');
-});
-tabImageBtn.addEventListener('click', () => {
-  tabImageBtn.classList.add('active');
-  tabTextBtn.classList.remove('active');
-  tabImagePanel.classList.add('active');
-  tabTextPanel.classList.remove('active');
-  result.classList.remove('active');
-});
+}
+tabTextBtn.addEventListener('click', () => showTab('text'));
+tabImageBtn.addEventListener('click', () => showTab('image'));
+tabPhoneBtn.addEventListener('click', () => showTab('phone'));
 
 dropzone.addEventListener('click', () => fileInput.click());
 dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('hover'); });
@@ -213,8 +228,8 @@ document.querySelectorAll('.example-chip').forEach(btn => {
 
 rescanBtn.addEventListener('click', () => {
   result.classList.remove('active');
-  input.focus();
-  input.select();
+  const field = { text: input, phone: phoneInput }[activeTab];
+  if (field) { field.focus(); field.select(); }
 });
 
 scanBtn.addEventListener('click', () => {
@@ -234,6 +249,19 @@ scanImageBtn.addEventListener('click', () => {
   progress.classList.add('active');
   result.classList.remove('active');
   runImageScan(currentImageBase64);
+});
+
+scanPhoneBtn.addEventListener('click', () => {
+  const number = phoneInput.value.trim();
+  if (!number) { phoneInput.focus(); return; }
+  scanPhoneBtn.disabled = true;
+  scanPhoneBtn.textContent = t('scanning', 'Scanning…');
+  progress.classList.add('active');
+  result.classList.remove('active');
+  runPhoneScan(number, phoneContext.value.trim());
+});
+phoneInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') scanPhoneBtn.click();
 });
 
 async function runScan(text){
@@ -278,6 +306,93 @@ async function runImageScan(dataUrl){
   }
 }
 
+async function runPhoneScan(number, context){
+  try {
+    const res = await fetch('/api/scan-phone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ number, context, language: currentLanguage, reading_level: simpleMode ? 'simple' : 'normal' })
+    });
+    const data = await res.json();
+    if (res.status === 400) { renderError(data.error || 'Check the number and try again.', false); return; }
+    if (!res.ok || data.error) throw new Error(data.error || 'Scan failed.');
+    renderResult(data);
+    loadHistory();
+    loadStats();
+  } catch (err) {
+    renderError(err.message || 'Something went wrong checking that number.');
+  } finally {
+    progress.classList.remove('active');
+    scanPhoneBtn.disabled = false;
+    scanPhoneBtn.textContent = t('scan_phone_btn', 'Scan number');
+  }
+}
+
+const OWNER_LOOKUP_SITES = [
+  { name: 'TruePeopleSearch', url: 'https://www.truepeoplesearch.com/' },
+  { name: 'FastPeopleSearch', url: 'https://www.fastpeoplesearch.com/reverse-phone-lookup' },
+];
+
+function phoneCardHtml(p){
+  const esc = s => escapeHtml(String(s));
+  const unknown = '<span class="phone-muted">' + esc(t('phone_unknown', 'Unknown')) + '</span>';
+  const row = (label, valueHtml) => '<div class="phone-fact"><dt>' + esc(label) + '</dt><dd>' + valueHtml + '</dd></div>';
+
+  const rows = [
+    row(t('phone_number', 'Number'), esc(p.display)),
+    row(t('phone_real', 'Real number?'), p.valid
+      ? esc(t('phone_real_yes', 'Yes, a valid number'))
+      : '<span class="phone-bad">' + esc(t('phone_real_no', 'No, not a valid number')) + '</span>'),
+    row(t('phone_location', 'Location'), [p.location, p.country].filter(Boolean).map(esc).join(', ') || unknown),
+    row(t('phone_line_type', 'Line type'), p.line_type
+      ? esc(p.line_type) + (p.voip_app ? ' · <strong>' + esc(p.voip_app) + '</strong>' : '')
+      : unknown),
+    row(t('phone_carrier', 'Carrier'), p.carrier
+      ? esc(p.carrier) + (p.carrier_is_original ? ' <span class="phone-muted">(' + esc(t('phone_carrier_original', 'original carrier; the number may have moved since')) + ')</span>' : '')
+      : unknown),
+  ];
+  if (p.caller_name) {
+    const kind = { CONSUMER: t('phone_owner_person', 'person'), BUSINESS: t('phone_owner_business', 'business') }[p.caller_type];
+    rows.push(row(t('phone_owner', 'Registered name'), esc(p.caller_name) + (kind ? ' <span class="phone-muted">(' + esc(kind) + ')</span>' : '')));
+  } else if (p.live_lookup === 'done' && p.owner_lookup) {
+    rows.push(row(t('phone_owner', 'Registered name'), '<span class="phone-muted">' + esc(t('phone_owner_none', 'No name registered')) + '</span>'));
+  }
+
+  const note = {
+    off: t('phone_live_off', "Live carrier lookup isn't set up, so line type comes from the numbering plan and apps like Google Voice can't be detected."),
+    failed: t('phone_live_failed', "The live carrier lookup didn't respond, so line type and carrier come from the numbering plan only."),
+  }[p.live_lookup];
+
+  const ownerLookup = p.owner_lookup
+    ? '<div class="owner-lookup">' +
+        '<p class="owner-lookup-head">' + esc(t('owner_lookup_head', 'Look up who owns it yourself')) + '</p>' +
+        '<p class="owner-lookup-body">' + esc(t('owner_lookup_body', 'Copy the number and search it on either site:')) + '</p>' +
+        '<div class="owner-lookup-actions">' +
+          '<button type="button" class="copy-number-btn" data-number="' + esc(p.display) + '">' + esc(t('copy_number', 'Copy number')) + '</button>' +
+          OWNER_LOOKUP_SITES.map(site => '<a class="owner-link" href="' + site.url + '" target="_blank" rel="noopener noreferrer">' + site.name + '</a>').join('') +
+        '</div>' +
+        '<p class="owner-lookup-warning">' + esc(t('owner_lookup_warning', "Scammers often fake (spoof) real people's numbers, so whoever is listed may not be who contacted you. Don't call, text, or confront them.")) + '</p>' +
+      '</div>'
+    : '';
+
+  return '<div class="phone-card">' +
+      '<p class="phone-card-head">' + esc(t('phone_head', 'About this number')) + '</p>' +
+      '<dl class="phone-facts">' + rows.join('') + '</dl>' +
+      (note ? '<p class="phone-card-note">' + esc(note) + '</p>' : '') +
+      ownerLookup +
+    '</div>';
+}
+
+phoneDetails.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.copy-number-btn');
+  if (!btn) return;
+  try {
+    await navigator.clipboard.writeText(btn.dataset.number);
+    btn.textContent = t('copied', 'Copied');
+    setTimeout(() => { btn.textContent = t('copy_number', 'Copy number'); }, 1600);
+  } catch (err) { /* clipboard blocked; the number is shown in the card to copy by hand */ }
+});
+
 function renderResult(parsed){
   currentScanId = parsed.id ?? null;
   fbThanks.textContent = '';
@@ -288,6 +403,10 @@ function renderResult(parsed){
   const iconMap = { safe: ICONS.check, caution: ICONS.alert, danger: ICONS.danger };
   const list = Array.isArray(parsed.findings) ? parsed.findings : [];
   const safety = parsed.safety_lines || {};
+  const isPhone = parsed.input_type === 'phone';
+
+  phoneDetails.innerHTML = isPhone && parsed.phone ? phoneCardHtml(parsed.phone) : '';
+  rescanBtn.textContent = isPhone ? t('rescan_phone', 'Scan another number') : t('rescan', 'Scan another message');
 
   verdict.className = 'verdict ' + state;
   verdictIcon.innerHTML = iconMap[state];
@@ -303,9 +422,15 @@ function renderResult(parsed){
 
   const knownMatchEl = document.getElementById('knownMatchBanner');
   if (parsed.known_matches === 1) {
-    knownMatchEl.innerHTML = '<div class="known-match-banner">🔁 ' + t('known_match_one', 'This exact message has been flagged once before.') + '</div>';
+    const txt = isPhone
+      ? t('known_phone_one', 'This number has been flagged once before.')
+      : t('known_match_one', 'This exact message has been flagged once before.');
+    knownMatchEl.innerHTML = '<div class="known-match-banner">🔁 ' + txt + '</div>';
   } else if (parsed.known_matches > 1) {
-    const txt = t('known_match_many', "This exact message has been flagged {n} times before - it's a known circulating scam.").replace('{n}', parsed.known_matches);
+    const txt = (isPhone
+      ? t('known_phone_many', 'This number has been flagged {n} times before.')
+      : t('known_match_many', "This exact message has been flagged {n} times before - it's a known circulating scam.")
+    ).replace('{n}', parsed.known_matches);
     knownMatchEl.innerHTML = '<div class="known-match-banner">🔁 ' + txt + '</div>';
   } else {
     knownMatchEl.innerHTML = '';
@@ -314,14 +439,18 @@ function renderResult(parsed){
   findings.innerHTML = '';
   findingsHead.textContent = t('findings_head', 'What we found');
   if (list.length === 0) {
-    findings.innerHTML = '<p class="empty-note">No manipulation tactics detected. That\'s a good sign, not a guarantee — if money, an OTP, or personal details are being asked for, confirm directly with the sender through a number or site you already trust before acting.</p>';
+    findings.innerHTML = isPhone
+      ? '<p class="empty-note">' + escapeHtml(t('phone_empty_note', 'Nothing about this number itself looks suspicious. Caller ID can be faked, though, so judge the call or text by what they ask for: never share codes, PINs, or payment details with someone who contacted you first.')) + '</p>'
+      : '<p class="empty-note">No manipulation tactics detected. That\'s a good sign, not a guarantee — if money, an OTP, or personal details are being asked for, confirm directly with the sender through a number or site you already trust before acting.</p>';
   } else {
     list.forEach(m => {
       const div = document.createElement('div');
       div.className = 'finding';
+      // Phone findings quote a fact about the number, not words from a message.
+      const quote = isPhone ? escapeHtml(m.quote) : '"' + escapeHtml(m.quote) + '"';
       div.innerHTML =
         '<span class="finding-tag">' + escapeHtml(m.tag || 'signal') + '</span>' +
-        (m.quote ? '<p class="finding-quote' + (state === 'caution' ? ' caution-border' : '') + '">"' + escapeHtml(m.quote) + '"</p>' : '') +
+        (m.quote ? '<p class="finding-quote' + (state === 'caution' ? ' caution-border' : '') + '">' + quote + '</p>' : '') +
         '<p class="finding-explain">' + escapeHtml(m.explain || '') + '</p>';
       findings.appendChild(div);
     });
@@ -389,14 +518,19 @@ readAloudBtn.addEventListener('click', () => {
   window.speechSynthesis.speak(utterance);
 });
 
-function renderError(message){
+function renderError(message, serverHint = true){
   currentScanId = null;
   verdict.className = 'verdict caution';
   verdictIcon.innerHTML = ICONS.alert;
   verdictLabel.textContent = "Couldn't complete the scan";
   verdictMeta.textContent = message;
+  phoneDetails.innerHTML = '';
+  document.getElementById('degradedBanner').innerHTML = '';
+  document.getElementById('knownMatchBanner').innerHTML = '';
   findingsHead.textContent = '';
-  findings.innerHTML = '<p class="empty-note">Check that the server is running and your Claude API key is set, then try again.</p>';
+  findings.innerHTML = serverHint
+    ? '<p class="empty-note">Check that the server is running and your Claude API key is set, then try again.</p>'
+    : '';
   actionBox.style.display = 'none';
   safetyBox.innerHTML = '';
   result.classList.add('active');

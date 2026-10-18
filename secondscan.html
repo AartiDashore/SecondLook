@@ -44,6 +44,7 @@
     <div class="tabs">
       <button class="tab-btn active" id="tabTextBtn">Paste text</button>
       <button class="tab-btn" id="tabImageBtn">Upload screenshot</button>
+      <button class="tab-btn" id="tabPhoneBtn">Phone number scan</button>
     </div>
 
     <div class="settings-row">
@@ -87,6 +88,15 @@
       </div>
     </div>
 
+    <div class="tab-panel" id="tabPhonePanel">
+      <input type="tel" id="phoneInput" class="phone-input" placeholder="Phone number, e.g. (206) 555-0123" autocomplete="off" inputmode="tel" aria-label="Phone number">
+      <textarea id="phoneContext" class="phone-context" placeholder="Optional: what did they say or ask for?" aria-label="What the caller or texter said"></textarea>
+      <div class="console-footer">
+        <span class="phone-hint" id="phoneHint">US numbers work without +1. For other countries, start with + and the country code. The number's owner is never contacted.</span>
+        <button class="scan" id="scanPhoneBtn">Scan number</button>
+      </div>
+    </div>
+
     <div class="scan-progress" id="progress"><div class="scan-progress-bar"></div></div>
   </div>
 
@@ -102,6 +112,7 @@
       </div>
       <button class="read-aloud-btn" id="readAloudBtn">🔊 <span id="readAloudLabel">Read aloud</span></button>
     </div>
+    <div id="phoneDetails"></div>
     <p class="findings-head" id="findingsHead">What we found</p>
     <div id="findings"></div>
 

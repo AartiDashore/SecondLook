@@ -3,7 +3,7 @@
 create table if not exists public.scans (
   id                  bigint generated always as identity primary key,
   created_at          timestamptz not null default now(),
-  input_type          text not null,          -- 'text' or 'screenshot'
+  input_type          text not null,          -- 'text', 'screenshot' or 'phone'
   input_snippet       text,
   normalized_text     text,
   verdict             text not null,          -- 'safe' | 'caution' | 'danger'

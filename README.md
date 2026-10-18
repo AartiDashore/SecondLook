@@ -7,7 +7,7 @@ This repo deploys as one Vercel project with these pages:
 | `/` | **Second Look** prototype (`prototype.html`): a pause the member controls |
 | `/secondscan` | **SecondScan** scam scanner (`secondscan.html`), backed by the FastAPI API in `app.py` |
 | `/secondscan/patterns` | SecondScan's common scam patterns page (`patterns.html`) |
-| `/api/*` | SecondScan API (`/api/scan`, `/api/scan-image`, `/api/feedback`, `/api/stats`, `/api/log`, `/api/languages`, `/api/ui-strings`) |
+| `/api/*` | SecondScan API (`/api/scan`, `/api/scan-image`, `/api/scan-phone`, `/api/feedback`, `/api/stats`, `/api/log`, `/api/languages`, `/api/ui-strings`) |
 
 `analysis/` (offline scoring script and synthetic data) and `deck/` (presentation slides) are not deployed.
 
@@ -21,6 +21,10 @@ Adapted from https://github.com/propcgamer20-png/tellsign
 
 ### Features
 - **Text and screenshot scanning.** Screenshots are read with Claude's vision.
+- **Phone number scan.** Checks whether a number is real, where it's from, its line type and carrier, and
+  whether it's a virtual (VoIP) number from an app like Google Voice or TextNow (with Twilio set up), then
+  gives the same plain-language verdict. US results link to people-search sites so you can look up the owner
+  yourself; SecondScan doesn't scrape them, since both sites' terms forbid automated access.
 - **Plain-language verdict** (likely scam / suspicious / looks safe) with the red-flag phrases quoted.
 - **Rule engine + LLM.** A set of explicit signal rules (urgency, OTP/PIN requests, shortened links,
   app-install pushes, prize and job-offer bait, ...) feeds hints into the model's own judgment
@@ -41,11 +45,15 @@ Supabase for the scan log, plain HTML/CSS/JS front end, deployed on Vercel.
 2. Optional, for scan history, stats, feedback and known-scam matching: create a Supabase project, run
    `supabase/schema.sql` in its SQL Editor, and set `SUPABASE_URL` and `SUPABASE_KEY` (the server-side
    `service_role` key; it never reaches the browser). Without them, scanning still works.
+3. Optional, for the phone number scan's live carrier lookup: set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
+   from a Twilio account. Each scan then costs about $0.018 in Twilio Lookup fees ($0.008 for line type and
+   carrier, $0.01 for the registered caller ID name, US numbers only). Without them, the phone scan still checks
+   the number against the numbering plan, but can't detect VoIP apps like Google Voice or show the carrier or owner.
 
 ## Run it locally
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install fastapi anthropic requests python-dotenv python-multipart uvicorn
+pip install fastapi anthropic requests python-dotenv python-multipart phonenumbers uvicorn
 uvicorn app:app --reload
 ```
 Then open http://127.0.0.1:8000 (Second Look) and http://127.0.0.1:8000/secondscan (SecondScan).
@@ -60,6 +68,7 @@ Then open http://127.0.0.1:8000 (Second Look) and http://127.0.0.1:8000/secondsc
 - `static/patterns.css`, `static/patterns.js`: patterns page styles and the example gallery
 - `app.py`: FastAPI app and SecondScan API
 - `signals.py`: the rule-based scam signals
+- `phone_lookup.py`: phone number facts (numbering plan and optional Twilio carrier lookup) and risk signals
 - `supabase/schema.sql`: the `scans` table the API reads and writes
 - `analysis/`: Second Look trigger scoring on the synthetic HuskyHack data
 - `deck/`: Second Look presentation slides

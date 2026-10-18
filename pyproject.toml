@@ -8,6 +8,7 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "python-multipart>=0.0.9",
+    "phonenumbers>=9.0",
 ]
 
 [tool.vercel]

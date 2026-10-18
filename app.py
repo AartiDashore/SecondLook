@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from phone_lookup import PhoneParseError, detect_phone_signals, display_facts, look_up, rule_verdict
 from signals import detect_signals, contains_link, requests_install
 
 load_dotenv()
@@ -76,6 +77,56 @@ ordinary and shows no manipulation tactics, return "verdict": "safe", a reassuri
 "recommended_action" appropriate to a safe message (e.g. "No action needed", translated), and an empty \
 "findings" array. Use "caution" for messages with 1-2 mild signals, and "danger" for messages with clear, \
 multiple, or severe manipulation tactics.
+
+READING LEVEL "simple" means: very short sentences, everyday words, no jargon, written for someone who is new \
+to smartphones or not fluent in reading long text. READING LEVEL "normal" means ordinary plain language."""
+
+PHONE_SYSTEM_PROMPT = """You are the phone number checker inside SecondScan, a tool that helps ordinary people decide \
+whether a phone number that called or texted them is likely to be a scam.
+
+You will be given facts about one phone number: what the official numbering plan says about it and, when it was \
+checked, a live carrier lookup (line type, current carrier, and the caller ID name registered to the number). A rule \
+engine has already flagged some risk signals - use them as hints, not gospel. You may also get the person's own \
+description of what the caller or texter said or asked for. You will also be told an OUTPUT LANGUAGE and a READING LEVEL.
+
+How to weigh the evidence:
+- Caller ID can be faked (spoofed), so a normal-looking number never proves a caller is genuine. Say so when relevant.
+- Invalid or unassigned numbers, fictional 555-01XX numbers, premium-rate numbers, and +1 numbers that look American \
+but belong to another country (used in "one-ring" callback scams) are strong red flags.
+- Virtual internet (VoIP) numbers from apps like Google Voice or TextNow are free and disposable, so scammers use them \
+heavily, but so do many ordinary people. Treat VoIP as a moderate signal that matters most when the caller claims to be \
+a bank, government agency or large company, because those organisations don't contact customers from consumer apps.
+- No registered caller ID name is common for mobile and VoIP numbers and is weak evidence on its own. A registered name \
+that doesn't match who the caller claimed to be is a strong red flag.
+- What the person describes (urgency, threats, requests for codes, PINs, payment, gift cards or remote access, prizes) \
+matters more than the number itself.
+- Never invent facts. If a fact is unknown or wasn't checked, don't guess the carrier, line type or owner, and \
+don't list the missing information as a finding: findings are only for actual warning signs.
+- Don't repeat the registered caller ID name in your answer; refer to it generically (for example "the name registered \
+to this number is a person's name, not a bank"). The app shows the name separately.
+
+Respond with ONLY valid JSON, no markdown fences, no commentary, in exactly this shape:
+{
+  "verdict": "safe" | "caution" | "danger",
+  "verdict_label": "a short label naming the verdict for display (meaning 'No red flags found' / 'Be careful with this number' / 'Likely a scam number'), written in the OUTPUT LANGUAGE",
+  "summary": "one short plain-language sentence explaining the overall verdict, in the OUTPUT LANGUAGE and READING LEVEL",
+  "recommended_action": "one concrete, specific next step the person should take right now, in the OUTPUT LANGUAGE and READING LEVEL",
+  "findings": [
+    { "tag": "short 2-4 word category name, in the OUTPUT LANGUAGE", "quote": "the specific fact behind this finding, copied from the facts or the person's description (for example 'Line type: virtual internet (VoIP) number')", "explain": "one plain-language sentence on why this matters, in the OUTPUT LANGUAGE and READING LEVEL" }
+  ],
+  "safety_lines": {
+    "never_share": "translate into the OUTPUT LANGUAGE: Never share your OTP, PIN, password, or CVV with anyone - your bank will never ask for this.",
+    "no_click": "translate into the OUTPUT LANGUAGE: Do not click links sent from this number.",
+    "no_install": "translate into the OUTPUT LANGUAGE: Do not install any app or file this caller asks you to - it could give them control of your phone or steal your data.",
+    "verify_official": "translate into the OUTPUT LANGUAGE: Don't call this number back. If it claims to be a company or agency, hang up and contact them using the number on their official website or the back of your card."
+  }
+}
+
+Always populate all four safety_lines fields. Only include a finding if there is a genuine, specific reason - do not \
+pad the list. Use "danger" for strong red flags, or for a VoIP or mismatched-name number combined with a scam-like \
+description, or for a clearly scam-like description. Use "caution" for moderate signals, such as a VoIP number with no \
+description. Use "safe" only when nothing about the number or the description is suspicious, with an empty "findings" \
+array, and a summary that still reminds the person caller ID can be faked.
 
 READING LEVEL "simple" means: very short sentences, everyday words, no jargon, written for someone who is new \
 to smartphones or not fluent in reading long text. READING LEVEL "normal" means ordinary plain language."""
@@ -225,8 +276,7 @@ def ask_claude(model: str, messages: list, effort: str, system: str | None = Non
     return "".join(parts).strip()
 
 
-def call_claude_text(message_text: str, signals: list, language: str = "English", reading_level: str = "normal") -> dict:
-    user_content = build_user_content(message_text, signals, language, reading_level)
+def call_claude_scan(system: str, user_content: str, fallback: dict) -> dict:
     last_error = None
     for model in (PRIMARY_MODEL, FALLBACK_MODEL):
         try:
@@ -234,7 +284,7 @@ def call_claude_text(message_text: str, signals: list, language: str = "English"
                 model,
                 [{"role": "user", "content": user_content}],
                 effort="medium",
-                system=SYSTEM_PROMPT,
+                system=system,
                 schema=SCAN_RESULT_SCHEMA,
             )
             data = stripped_json(raw)
@@ -244,9 +294,92 @@ def call_claude_text(message_text: str, signals: list, language: str = "English"
         except Exception as e:
             last_error = e
     # Both models failed - degrade gracefully instead of erroring out the whole scan.
-    result = rule_only_result(signals)
-    result["_error"] = str(last_error)
-    return result
+    fallback["_error"] = str(last_error)
+    return fallback
+
+
+def call_claude_text(message_text: str, signals: list, language: str = "English", reading_level: str = "normal") -> dict:
+    user_content = build_user_content(message_text, signals, language, reading_level)
+    return call_claude_scan(SYSTEM_PROMPT, user_content, rule_only_result(signals))
+
+
+PHONE_VERDICT_LABELS = {"safe": "No red flags found", "caution": "Be careful with this number", "danger": "Likely a scam number"}
+PHONE_SAFETY_LINES = {
+    "never_share": "Never share your OTP, PIN, password, or CVV with anyone - your bank will never ask for this.",
+    "no_click": "Do not click links sent from this number.",
+    "no_install": "Do not install any app or file this caller asks you to - it could give them control of your phone or steal your data.",
+    "verify_official": "Don't call this number back. If it claims to be a company or agency, hang up and contact them using the number on their official website or the back of your card.",
+}
+PHONE_SIGNAL_WEIGHT = {
+    "high": "This is a strong warning sign.",
+    "medium": "This is a warning sign, especially if the caller claims to be a bank, agency or company.",
+    "low": "This is a weak warning sign on its own.",
+}
+
+
+def build_phone_user_content(
+    facts: dict, phone_signals: list, context: str, context_signals: list, language: str, reading_level: str
+) -> str:
+    def yes_no(value) -> str:
+        return "yes" if value else "no"
+
+    if facts["live_lookup"] == "done":
+        if facts.get("caller_name"):
+            caller = f"{facts['caller_name']} ({(facts.get('caller_type') or 'type unknown').lower()})"
+        else:
+            caller = "none registered" if facts["region_code"] == "US" else "not available outside the US"
+        live_lines = (
+            f"- Line type (live carrier lookup): {facts.get('live_line_type') or 'unknown'}\n"
+            f"- Current carrier: {facts.get('live_carrier') or 'unknown'}\n"
+            f"- Registered caller ID name: {caller}\n"
+        )
+    else:
+        state = "not set up" if facts["live_lookup"] == "off" else "failed"
+        live_lines = f"- Live carrier lookup: {state}, so the current line type, carrier and caller ID name are unknown\n"
+    if facts["voip_app"]:
+        live_lines += f"- VoIP app behind the number: {facts['voip_app']}\n"
+
+    phone_signal_lines = "\n".join(f"- {s['label']} ({s['severity']})" for s in phone_signals) or "- none"
+    context_signal_lines = "\n".join(f"- {s['label']}" for s in context_signals) or "- none detected"
+    description = f'"""\n{context}\n"""' if context else "(none given)"
+    return (
+        "Phone number facts:\n"
+        f"- Number: {facts['display']} ({facts['e164']})\n"
+        f"- Valid, assigned number: {yes_no(facts['valid'])}\n"
+        f"- Right length for its country: {yes_no(facts['possible'])}\n"
+        f"- Country: {facts['country'] or 'unknown'}\n"
+        f"- Area (numbering plan): {facts['location'] or 'unknown'}\n"
+        f"- Number type (numbering plan): {facts['number_type'] or 'unknown'}\n"
+        f"- Original carrier (numbering plan): {facts['original_carrier'] or 'unknown'}\n"
+        f"{live_lines}\n"
+        f"Rule engine flagged about the number:\n{phone_signal_lines}\n\n"
+        f"Person's description of the call or text:\n{description}\n\n"
+        f"Rule engine flagged in the description:\n{context_signal_lines}\n\n"
+        f"OUTPUT LANGUAGE: {language}\n"
+        f"READING LEVEL: {reading_level}"
+    )
+
+
+def phone_rule_only_result(phone_signals: list, context_signals: list) -> dict:
+    """Degraded, AI-unavailable fallback for a phone scan, built from the number checks alone."""
+    verdict = rule_verdict(phone_signals, context_signals)
+    findings = [
+        {"tag": "number check", "quote": s["label"], "explain": PHONE_SIGNAL_WEIGHT[s["severity"]]}
+        for s in phone_signals
+    ] + [
+        {"tag": s["label"], "quote": "", "explain": f"Pattern-matched in your description: {s['label']}."}
+        for s in context_signals
+    ]
+    return {
+        "verdict": verdict,
+        "verdict_label": PHONE_VERDICT_LABELS[verdict],
+        "summary": "AI analysis is temporarily unavailable, so this result is from SecondScan's number checks only.",
+        "recommended_action": "Treat this as a lower-confidence result. Don't call the number back; if it claimed to be a company, contact them through their official website.",
+        "findings": findings,
+        "safety_lines": dict(PHONE_SAFETY_LINES),
+        "_model_used": "rule-engine-only",
+        "_degraded": True,
+    }
 
 
 class UnsupportedImageError(ValueError):
@@ -284,8 +417,7 @@ def ocr_image(data_url: str) -> str:
     )
 
 
-def log_scan(input_type, snippet, result, model_used, language, degraded) -> int:
-    normalized = normalize_text(snippet)
+def log_scan(input_type, snippet, result, model_used, language, degraded, normalized) -> int:
     row = sb_insert(
         "scans",
         {
@@ -329,23 +461,27 @@ class ImageScanRequest(BaseModel):
     reading_level: str = "normal"
 
 
-def finalize_scan(input_type: str, message_text: str, language: str, reading_level: str):
-    signals = detect_signals(message_text)
-    result = call_claude_text(message_text, signals, language, reading_level)
+class PhoneScanRequest(BaseModel):
+    number: str
+    context: str = ""  # what the caller or texter said or asked for, if the person tells us
+    language: str = "English"
+    reading_level: str = "normal"
 
-    model_used = result.pop("_model_used", PRIMARY_MODEL)
-    degraded = result.pop("_degraded", False)
-    result.pop("_error", None)
 
-    row_id, known_matches = None, 0
+def log_and_count(input_type, snippet, result, model_used, language, degraded, match_key) -> tuple[int | None, int]:
+    """Logs the scan and counts earlier non-safe scans with the same match key."""
+    row_id = None
     if SUPABASE_ENABLED:
         # A database problem should never stop someone getting their scam verdict.
         try:
-            row_id = log_scan(input_type, message_text, result, model_used, language, degraded)
-            known_matches = count_known_matches(normalize_text(message_text), exclude_id=row_id)
+            row_id = log_scan(input_type, snippet, result, model_used, language, degraded, match_key)
+            return row_id, count_known_matches(match_key, exclude_id=row_id)
         except requests.RequestException as e:
             print(f"Supabase unavailable, scan not logged: {e}")
+    return row_id, 0
 
+
+def scan_response(result: dict, row_id, degraded: bool, known_matches: int, text: str) -> dict:
     return {
         "id": row_id,
         "verdict": result["verdict"],
@@ -354,11 +490,25 @@ def finalize_scan(input_type: str, message_text: str, language: str, reading_lev
         "recommended_action": result.get("recommended_action", ""),
         "findings": result.get("findings", []),
         "safety_lines": result.get("safety_lines", {}),
-        "has_link": bool(contains_link(message_text)),
-        "has_install_request": bool(requests_install(message_text)),
+        "has_link": bool(contains_link(text)),
+        "has_install_request": bool(requests_install(text)),
         "degraded": degraded,
         "known_matches": known_matches,
     }
+
+
+def finalize_scan(input_type: str, message_text: str, language: str, reading_level: str):
+    signals = detect_signals(message_text)
+    result = call_claude_text(message_text, signals, language, reading_level)
+
+    model_used = result.pop("_model_used", PRIMARY_MODEL)
+    degraded = result.pop("_degraded", False)
+    result.pop("_error", None)
+
+    row_id, known_matches = log_and_count(
+        input_type, message_text, result, model_used, language, degraded, normalize_text(message_text)
+    )
+    return scan_response(result, row_id, degraded, known_matches, message_text)
 
 
 @app.post("/api/scan")
@@ -389,6 +539,36 @@ async def scan_image(req: ImageScanRequest):
 
     response = finalize_scan("screenshot", message_text, req.language, req.reading_level)
     response["transcribed_text"] = message_text
+    return response
+
+
+@app.post("/api/scan-phone")
+async def scan_phone(req: PhoneScanRequest):
+    try:
+        facts = look_up(req.number)
+    except PhoneParseError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+    context = req.context.strip()[:2000]
+    phone_signals = detect_phone_signals(facts)
+    context_signals = detect_signals(context) if context else []
+    user_content = build_phone_user_content(
+        facts, phone_signals, context, context_signals, req.language, req.reading_level
+    )
+    result = call_claude_scan(PHONE_SYSTEM_PROMPT, user_content, phone_rule_only_result(phone_signals, context_signals))
+
+    model_used = result.pop("_model_used", PRIMARY_MODEL)
+    degraded = result.pop("_degraded", False)
+    result.pop("_error", None)
+
+    # Matched on the number alone, so a number flagged before is recognised whatever the description says.
+    snippet = facts["display"] + (f" · {context}" if context else "")
+    row_id, known_matches = log_and_count(
+        "phone", snippet, result, model_used, req.language, degraded, normalize_text(facts["e164"])
+    )
+    response = scan_response(result, row_id, degraded, known_matches, context)
+    response["input_type"] = "phone"
+    response["phone"] = display_facts(facts)
     return response
 
 
@@ -461,6 +641,36 @@ UI_STRINGS_EN = {
     "protected_label": "scams caught for your family",
     "read_aloud": "Read aloud",
     "reading_simple": "Explain simply",
+    "tab_phone": "Phone number scan",
+    "placeholder_phone": "Phone number, e.g. (206) 555-0123",
+    "placeholder_phone_context": "Optional: what did they say or ask for?",
+    "scan_phone_btn": "Scan number",
+    "phone_hint": "US numbers work without +1. For other countries, start with + and the country code. The number's owner is never contacted.",
+    "rescan_phone": "Scan another number",
+    "phone_head": "About this number",
+    "phone_number": "Number",
+    "phone_real": "Real number?",
+    "phone_real_yes": "Yes, a valid number",
+    "phone_real_no": "No, not a valid number",
+    "phone_location": "Location",
+    "phone_line_type": "Line type",
+    "phone_carrier": "Carrier",
+    "phone_carrier_original": "original carrier; the number may have moved since",
+    "phone_owner": "Registered name",
+    "phone_owner_none": "No name registered",
+    "phone_owner_person": "person",
+    "phone_owner_business": "business",
+    "phone_unknown": "Unknown",
+    "phone_live_off": "Live carrier lookup isn't set up, so line type comes from the numbering plan and apps like Google Voice can't be detected.",
+    "phone_live_failed": "The live carrier lookup didn't respond, so line type and carrier come from the numbering plan only.",
+    "owner_lookup_head": "Look up who owns it yourself",
+    "owner_lookup_body": "Copy the number and search it on either site:",
+    "owner_lookup_warning": "Scammers often fake (spoof) real people's numbers, so whoever is listed may not be who contacted you. Don't call, text, or confront them.",
+    "copy_number": "Copy number",
+    "copied": "Copied",
+    "known_phone_one": "This number has been flagged once before.",
+    "known_phone_many": "This number has been flagged {n} times before.",
+    "phone_empty_note": "Nothing about this number itself looks suspicious. Caller ID can be faked, though, so judge the call or text by what they ask for: never share codes, PINs, or payment details with someone who contacted you first.",
 }
 
 
