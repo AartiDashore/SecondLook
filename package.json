@@ -1,0 +1,14 @@
+{
+  "name": "secondlook",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SecondLook frontend server and Python confidence API proxy",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node dev.js",
+    "test": "node --test server.test.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

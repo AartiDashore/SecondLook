@@ -16,11 +16,14 @@ from score_all_members import (  # noqa: E402
     TransactionNotFoundError,
     assign_risk_tier,
     calculate_max_possible_risk_score,
+    get_michael_demo_confidence,
+    get_scam_payment_ids,
     get_transaction_confidence,
     make_api_response,
     normalize_risk_score,
     rank_positive_risk_factors,
     score_events,
+    select_demo_payment_id,
 )
 
 
@@ -183,6 +186,33 @@ class ScoringTests(unittest.TestCase):
 
 
 class MobileConfidenceTests(unittest.TestCase):
+    def test_m1002_scam_payments_are_read_from_member_key(self):
+        self.assertEqual(
+            get_scam_payment_ids("M1002"),
+            (
+                "P1002-006",
+                "P1002-007",
+                "P1002-008",
+                "P1002-009",
+                "P1002-010",
+                "P1002-011",
+                "P1002-012",
+            ),
+        )
+
+    def test_demo_selects_latest_scam_labeled_wire(self):
+        self.assertEqual(select_demo_payment_id(), "P1002-012")
+        self.assertEqual(
+            get_michael_demo_confidence(),
+            get_transaction_confidence("M1002", "P1002-012"),
+        )
+
+    def test_configured_demo_payment_must_be_scam_labeled(self):
+        from score_all_members import DemoPaymentSelectionError
+
+        with self.assertRaises(DemoPaymentSelectionError):
+            select_demo_payment_id(configured_payment_id="P1002-005")
+
     def test_m1002_selected_wire_returns_expected_public_response(self):
         response = get_transaction_confidence("M1002", "P1002-012")
 

@@ -13,7 +13,9 @@ import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_EVENTS_PATH = BASE_DIR / "HuskyHack_Synthetic_Events_v2.csv"
+DEFAULT_MEMBER_KEY_PATH = BASE_DIR / "HuskyHack_Member_Key_v2.csv"
 DEFAULT_OUTPUT_PATH = BASE_DIR / "scored_payments.pkl"
+MICHAEL_MEMBER_ID = "M1002"
 
 RISK_RULES = {
     "new_recipient": {
@@ -140,6 +142,10 @@ class TransactionNotFoundError(LookupError):
     """Raised when a member/payment pair does not exist in the scored events."""
 
 
+class DemoPaymentSelectionError(LookupError):
+    """Raised when a configured scam-demo payment cannot be selected."""
+
+
 def normalize_risk_score(raw_risk_score: Any, max_possible_risk_score: Any = MAX_POSSIBLE_RISK_SCORE) -> tuple[float, float]:
     """Return risk and confidence percentages using tier-aligned interpolation."""
     raw_score = _finite_number(raw_risk_score, default=0.0)
@@ -238,6 +244,79 @@ def get_transaction_confidence(
         "risk_tier": str(payment["risk_tier"]),
         "top_risk_factors": rank_positive_risk_factors(payment["risk_factors"]),
     }
+
+
+def get_scam_payment_ids(
+    member_id: str,
+    member_key_path: Path | str = DEFAULT_MEMBER_KEY_PATH,
+) -> tuple[str, ...]:
+    """Return ground-truth scam payment IDs for offline demo selection only."""
+    member_key = pd.read_csv(member_key_path, dtype={"synthetic_member_id": "string"})
+    matches = member_key[member_key["synthetic_member_id"].eq(member_id)]
+    if len(matches) != 1:
+        raise DemoPaymentSelectionError(
+            f"Expected one member-key record for {member_id!r}, found {len(matches)}."
+        )
+    value = matches.iloc[0].get("scam_payment_ids")
+    if pd.isna(value):
+        return ()
+    return tuple(payment_id.strip() for payment_id in str(value).split(";") if payment_id.strip())
+
+
+def select_demo_payment_id(
+    member_id: str = MICHAEL_MEMBER_ID,
+    configured_payment_id: str | None = None,
+    events_path: Path | str = DEFAULT_EVENTS_PATH,
+    member_key_path: Path | str = DEFAULT_MEMBER_KEY_PATH,
+) -> str:
+    """Select a configured scam payment or the latest scam-labeled wire payment."""
+    scam_payment_ids = get_scam_payment_ids(member_id, member_key_path)
+    if not scam_payment_ids:
+        raise DemoPaymentSelectionError(f"No scam-labeled payments exist for {member_id!r}.")
+
+    events = pd.read_csv(events_path, parse_dates=["event_timestamp"])
+    payments = events[
+        events["synthetic_member_id"].eq(member_id)
+        & events["event_type"].eq("Payment Initiated")
+        & events["payment_id"].isin(scam_payment_ids)
+    ].copy()
+    if payments.empty:
+        raise DemoPaymentSelectionError(
+            f"No scam-labeled initiated payments were found for {member_id!r}."
+        )
+
+    if configured_payment_id:
+        configured = payments[payments["payment_id"].eq(configured_payment_id)]
+        if configured.empty:
+            raise DemoPaymentSelectionError(
+                f"Configured payment {configured_payment_id!r} is not a scam-labeled "
+                f"initiated payment for {member_id!r}."
+            )
+        return configured_payment_id
+
+    wire_payments = payments[payments["payment_rail"].eq("Wire")]
+    candidates = wire_payments if not wire_payments.empty else payments
+    selected = candidates.sort_values(
+        ["event_timestamp", "event_sequence"],
+        kind="stable",
+        na_position="first",
+    ).iloc[-1]
+    return str(selected["payment_id"])
+
+
+def get_michael_demo_confidence(
+    configured_payment_id: str | None = None,
+    events_path: Path | str = DEFAULT_EVENTS_PATH,
+    member_key_path: Path | str = DEFAULT_MEMBER_KEY_PATH,
+) -> dict[str, Any]:
+    """Return the public response for Michael's selected scam-demo payment."""
+    payment_id = select_demo_payment_id(
+        member_id=MICHAEL_MEMBER_ID,
+        configured_payment_id=configured_payment_id,
+        events_path=events_path,
+        member_key_path=member_key_path,
+    )
+    return get_transaction_confidence(MICHAEL_MEMBER_ID, payment_id, events_path)
 
 
 def score_events(events: pd.DataFrame) -> pd.DataFrame:
@@ -416,6 +495,9 @@ def _score_payment(member_id: Any, member_events: pd.DataFrame, payment: pd.Seri
         "payment_id": payment["payment_id"],
         "payment_rail": payment_rail,
         "amount": amount,
+        "recipient_id": recipient_id,
+        "recipient_age_days": recipient_age,
+        "amount_to_baseline_ratio": amount_ratio,
         "raw_risk_score": raw_score,
         "normalized_risk_score": normalized_risk,
         "confidence_score": confidence_percentage,

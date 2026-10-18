@@ -1,55 +1,43 @@
 (function () {
-  const member1002 = {
-    "synthetic_member_id": "M1002",
-    "anchor_persona": "Michael",
-    "scenario_type": "Romance / Investment",
-    "scenario_subtype": "Online partner / crypto 'investment'",
-    "is_legitimate_lookalike": "No",
-    "journey_summary": "Michael: P2P to an online partner grew for weeks, then moved to wire 'investments'. Continued through warnings; reported when the platform blocked withdrawals.",
-    "incident_start": "9/8/2026 13:20",
-    "first_intervention": "",
-    "journey_outcome": "Loss",
-    "scam_payment_ids": [
-      "P1002-006",
-      "P1002-007",
-      "P1002-008",
-      "P1002-009",
-      "P1002-010",
-      "P1002-011",
-      "P1002-012"
-    ],
-    "dollars_attempted": 8487.77,
-    "dollars_sent": 8487.77,
-    "dollars_prevented": 0,
-    "dollars_recovered": 0,
-    "net_member_loss": 8487.77,
-    "intervention_candidate": "Recipient-setup friction, pattern-aware warning, human outreach without blame, recovery help"
-  }
-
-  // TODO: API Call 
-
-  const SCORE = 55;
   const CIRCUMFERENCE = 2 * Math.PI * 52; // matches r=52 in the SVG
-
-  const RISKS = ["Increasing payments", "3x Higher than your usual total", "New recipient (added less than 30 days ago)"];
+  const CONFIDENCE_COLORS = {
+    low: { accent: '#b42318', soft: '#fee4e2' },
+    moderate: { accent: '#b88200', soft: '#f7e7a6' },
+    high: { accent: '#157347', soft: '#d9f2e6' }
+  };
 
   const scoreEl = document.getElementById('score');
   const progress = document.getElementById('progress');
   const badge = document.getElementById('badge');
   const toast = document.getElementById('toast');
+  const riskHeading = document.getElementById('riskHeading');
+  const riskList = document.getElementById('riskList');
 
-  // Label thresholds
-  function labelFor(score) {
-    if (score >= 80) return 'Looks good';
-    if (score >= 50) return 'Review recommended';
-    return 'High risk';
+  function recommendationFor(tier) {
+    if (tier === 'Stop') return 'Do not proceed';
+    if (tier === 'Pause') return 'Review recommended';
+    if (tier === 'Nudge') return 'Proceed with caution';
+    return 'No additional review recommended';
   }
 
-  // Animate gauge and counter
+  function colorsFor(score) {
+    if (score <= 39) return CONFIDENCE_COLORS.low;
+    if (score <= 69) return CONFIDENCE_COLORS.moderate;
+    return CONFIDENCE_COLORS.high;
+  }
+
+  function applyConfidenceColors(score) {
+    const colors = colorsFor(score);
+    progress.style.stroke = colors.accent;
+    scoreEl.style.color = colors.accent;
+    badge.style.color = colors.accent;
+    badge.style.backgroundColor = colors.soft;
+  }
+
   function animateScore(target, duration = 1200) {
+    applyConfidenceColors(target);
     progress.style.strokeDasharray = CIRCUMFERENCE;
     progress.style.strokeDashoffset = CIRCUMFERENCE;
-    // force reflow so the transition runs
     void progress.getBoundingClientRect();
     progress.style.strokeDashoffset = CIRCUMFERENCE * (1 - target / 100);
 
@@ -61,17 +49,69 @@
       if (t < 1) requestAnimationFrame(tick);
     }
     requestAnimationFrame(tick);
-    badge.textContent = labelFor(target);
   }
 
-  // Populate risk list
-  const riskList = document.getElementById('riskList');
-  RISKS.forEach((risk, index) => {
-    const li = document.createElement('li');
-    li.id = `risk${index + 1}`;
-    li.innerHTML = `<strong>${risk}</strong>`;
-    riskList.appendChild(li);
-  });
+  function renderRiskFactors(factors) {
+    riskList.replaceChildren();
+    riskHeading.textContent = `${factors.length} risk factor${factors.length === 1 ? '' : 's'}`;
+    factors.forEach((factor, index) => {
+      const item = document.createElement('li');
+      const content = document.createElement('div');
+      const title = document.createElement('strong');
+      const description = document.createElement('p');
+      item.id = `risk${index + 1}`;
+      title.textContent = factor.title;
+      description.textContent = factor.description;
+      content.append(title, description);
+      item.appendChild(content);
+      riskList.appendChild(item);
+    });
+  }
+
+  function showUnavailable(message) {
+    scoreEl.textContent = '--';
+    progress.style.strokeDasharray = CIRCUMFERENCE;
+    progress.style.strokeDashoffset = CIRCUMFERENCE;
+    progress.style.stroke = '#6b7190';
+    scoreEl.style.color = '#6b7190';
+    badge.textContent = 'Confidence unavailable';
+    badge.style.color = '#6b7190';
+    badge.style.backgroundColor = '#ececf3';
+    riskHeading.textContent = 'Risk factors unavailable';
+    riskList.replaceChildren();
+    const item = document.createElement('li');
+    const text = document.createElement('p');
+    text.textContent = message;
+    item.appendChild(text);
+    riskList.appendChild(item);
+  }
+
+  function validateResponse(payload) {
+    const score = Number(payload.confidence_percentage);
+    if (!Number.isInteger(score) || score < 0 || score > 100) {
+      throw new Error('The confidence service returned an invalid score.');
+    }
+    if (!Array.isArray(payload.top_risk_factors) || typeof payload.risk_tier !== 'string') {
+      throw new Error('The confidence service returned incomplete results.');
+    }
+    return score;
+  }
+
+  async function loadConfidence() {
+    try {
+      const response = await fetch('/api/demo/michael', {
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error('The confidence service is currently unavailable.');
+      const payload = await response.json();
+      const score = validateResponse(payload);
+      badge.textContent = recommendationFor(payload.risk_tier);
+      renderRiskFactors(payload.top_risk_factors);
+      animateScore(score);
+    } catch (error) {
+      showUnavailable(error.message || 'Please try again later.');
+    }
+  }
 
   // Toast helper
   let toastTimer;
@@ -82,7 +122,6 @@
     toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
   }
 
-  // Button handlers (replace with real navigation / API calls)
   document.getElementById('contactBtn').addEventListener('click', () => {
     showToast('Connecting you to a representative…');
   });
@@ -98,6 +137,9 @@
     showToast('Going back…');
   });
 
-  window.addEventListener('DOMContentLoaded', () => animateScore(SCORE));
-  if (document.readyState !== 'loading') animateScore(SCORE);
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', loadConfidence);
+  } else {
+    loadConfidence();
+  }
 })();
