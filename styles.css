@@ -24,6 +24,15 @@ body {
   padding: 32px;
 }
 
+.buttons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+button {
+  margin: 8px 0;
+}
+
 /* Desktop window */
 .window {
   position: relative;
