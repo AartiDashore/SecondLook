@@ -8,3 +8,6 @@ server.log
 .vercel
 .venv/
 .DS_Store
+.venv/
+__pycache__/
+*.py[cod]
