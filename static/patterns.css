@@ -69,10 +69,18 @@
 .app-bar.whatsapp{ background:linear-gradient(180deg, #2ABE64, #17924A); }
 .app-bar.sms{ background:linear-gradient(180deg, #3FA6FF, #1B7FE0); }
 .app-bar.call{ background:#151A3E; }
+.app-bar.dating{ background:linear-gradient(180deg, #FF5F8F, #E0306A); }
+.app-bar-meta{ margin-left:auto; font-size:12px; font-weight:500; opacity:.9; }
 
 .device-body{ background:rgba(2,30,21,0.55); padding:16px; }
 
+.thread{ display:flex; flex-direction:column; gap:10px; }
+.thread-divider{
+  text-align:center; font-family:'IBM Plex Mono', monospace; font-size:11px;
+  color:rgba(210,250,230,0.55); margin:4px 0;
+}
 .msg-row{ display:flex; gap:8px; align-items:flex-end; }
+.msg-row.you{ justify-content:flex-end; }
 .avatar{
   width:26px; height:26px; border-radius:50%; background:rgba(255,255,255,0.14);
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
@@ -82,6 +90,10 @@
   background:rgba(255,255,255,0.09); border:1px solid rgba(160,245,205,0.2);
   border-radius:4px 14px 14px 14px;
   padding:13px 15px; font-size:14px; line-height:1.65; color:#F0FFF8; max-width:100%;
+}
+.bubble.you{
+  background:rgba(63,166,255,0.24); border-color:rgba(130,200,255,0.38);
+  border-radius:14px 4px 14px 14px; max-width:85%;
 }
 
 .call-screen{ text-align:center; padding:10px 4px 4px; }

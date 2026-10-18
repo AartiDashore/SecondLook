@@ -713,8 +713,18 @@ SECOND_LOOK_PATH = BASE_DIR / "prototype.html"
 SECONDSCAN_PATH = BASE_DIR / "secondscan.html"
 PATTERNS_PATH = BASE_DIR / "patterns.html"
 
+class RevalidatedStaticFiles(StaticFiles):
+    """Makes the browser check for a newer file on every load (a quick 304 when it hasn't
+    changed), so edits to the CSS and JS show up without a hard refresh."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 # SecondScan's stylesheets and scripts (static/secondscan.*, static/patterns.*).
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+app.mount("/static", RevalidatedStaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
 @app.get("/", response_class=HTMLResponse)

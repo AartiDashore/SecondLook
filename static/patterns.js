@@ -3,9 +3,13 @@ const ICONS = {
   sms: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H7l-3 3z"/></svg>',
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.4 2.1L8 10.1a16 16 0 0 0 6 6l1.4-1.4a2 2 0 0 1 2.1-.4c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.6 2Z"/></svg>',
   person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
-  caller: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>'
+  caller: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 8 3.4 4.5 7 4.5c2.1 0 3.6 1.2 5 3 1.4-1.8 2.9-3 5-3 3.6 0 5.6 3.5 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2Z"/></svg>'
 };
 
+// Most common first, from 2025 FTC (US) and I4C (India) data: bank/government impersonation
+// is the most reported scam; investment scams, which the 'wrong number' romance leads to, cause
+// the biggest losses; romance scam losses are rising; digital arrest complaints are falling.
 const GALLERY = [
   {
     id: 'bank', kind: 'sms', title: 'Fake KYC / account-block alert', sender: 'AD-ALERTS',
@@ -16,6 +20,50 @@ const GALLERY = [
       { text: " due to pending KYC verification. Please " },
       { text: "share your OTP and account number", reason: "No bank, ever, asks you to share an OTP. Doing so hands over full access to your account." },
       { text: " immediately to avoid suspension. - Bank Security Team" }
+    ]
+  },
+  {
+    id: 'wrongnumber', kind: 'sms', title: '"Wrong number" text that turns into romance', sender: 'Unknown number',
+    messages: [
+      { from: 'them', segments: [
+        { text: "Mary, it's Janey! Are you ready for the class reunion tomorrow?", reason: "Scammers text random numbers with a believable 'wrong number' message, hoping a polite reply starts a conversation." }
+      ] },
+      { from: 'you', text: "Sorry, wrong number." },
+      { from: 'them', segments: [
+        { text: "Oh, how embarrassing! " },
+        { text: "You seem so kind though, maybe it was fate", reason: "Instead of ending the chat, they keep it going with flattery. The wrong number was the hook." },
+        { text: " 😊" }
+      ] },
+      { divider: 'Three weeks later' },
+      { from: 'them', segments: [
+        { text: "Babe, I want a future with you. " },
+        { text: "I've made thousands trading crypto and I can show you how", reason: "Once they have your trust, they pitch an investment on a platform they control. The profits you see are fake, and these \"pig butchering\" scams take everything you put in." },
+        { text: ". " },
+        { text: "Just send $500 to start, it's not risky at all", reason: "Every real investment carries risk. Promised easy returns from someone you've never met in person is a scam." }
+      ] }
+    ]
+  },
+  {
+    id: 'romance', kind: 'dating', title: 'Romance scam: the sudden emergency', sender: 'Tom · 83 miles away',
+    messages: [
+      { from: 'them', segments: [
+        { text: "I know we only matched last week, but " },
+        { text: "I've never felt this way about anyone before", reason: "Intense declarations of love within days of matching, known as love bombing, are how romance scammers build trust fast." },
+        { text: " ❤️" }
+      ] },
+      { from: 'them', segments: [
+        { text: "I was finally driving to see you, but " },
+        { text: "my car broke down and the repair is $1,200", reason: "A sudden emergency that only money can fix, right before you'd finally meet, is the turning point of nearly every romance scam." },
+        { text: ". I can't afford it." }
+      ] },
+      { from: 'you', text: "Oh no! Could you take an Uber?" },
+      { from: 'them', segments: [
+        { text: "They don't come out this far 😔 " },
+        { text: "Could you send it as gift cards or by Zelle?", reason: "Gift cards, wire transfers, crypto and payment apps are hard to trace and almost impossible to reverse. Someone who cares about you won't ask for money this way." },
+        { text: " " },
+        { text: "I'll pay you back the moment we meet", reason: "The meeting keeps slipping. There's always another reason they can't show up or video call, and another bill to pay first." },
+        { text: "." }
+      ] }
     ]
   },
   {
@@ -58,16 +106,43 @@ function escapeHtml(str){
   return str.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-function segmentsToHtml(card){
-  return card.segments.map((seg, i) => {
+// A card shows one message (`segments`) or a conversation (`messages`): each message is
+// { from: 'them' | 'you', segments } (or `text` when nothing in it is flagged), or a
+// { divider } line marking time passing.
+function cardMessages(card){
+  return (card.messages || [{ from: 'them', segments: card.segments }])
+    .map(msg => msg.divider ? msg : { from: msg.from, segments: msg.segments || [{ text: msg.text }] });
+}
+
+// Flagged phrases, numbered in reading order across the whole card.
+function flaggedSegments(card){
+  const flags = [];
+  cardMessages(card).forEach((msg, m) => (msg.segments || []).forEach((seg, i) => {
+    if (seg.reason) flags.push({ key: card.id + '-' + m + '-' + i, reason: seg.reason });
+  }));
+  return flags;
+}
+
+function segmentsToHtml(card, m, segments, numbers){
+  return segments.map((seg, i) => {
     if (!seg.reason) return escapeHtml(seg.text);
-    const num = card.segments.slice(0, i + 1).filter(s => s.reason).length;
-    return '<span class="flag" tabindex="0" role="button" data-card="' + card.id + '" data-legend="' + card.id + '-' + i + '">' +
-      escapeHtml(seg.text) + '<sup>' + num + '</sup></span>';
+    const key = card.id + '-' + m + '-' + i;
+    return '<span class="flag" tabindex="0" role="button" data-card="' + card.id + '" data-legend="' + key + '">' +
+      escapeHtml(seg.text) + '<sup>' + numbers[key] + '</sup></span>';
   }).join('');
 }
 
+// What "Test this in the scanner" pastes in: everything the scammer wrote.
+function scammerText(card){
+  return cardMessages(card).filter(msg => msg.from === 'them')
+    .map(msg => msg.segments.map(s => s.text).join('')).join('\n');
+}
+
 function deviceChrome(card){
+  if (card.kind === 'dating') {
+    return '<div class="device-status"><span>9:41</span><div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>' +
+      '<div class="app-bar dating">' + ICONS.heart + '<span>Dating app</span><span class="app-bar-meta">' + escapeHtml(card.sender) + '</span></div>';
+  }
   if (card.kind === 'whatsapp') {
     return '<div class="device-status"><span>9:41</span><div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div></div>' +
       '<div class="app-bar whatsapp">' + ICONS.chat + '<span>WhatsApp</span></div>';
@@ -81,17 +156,24 @@ function deviceChrome(card){
 }
 
 function deviceBody(card){
-  const bubbleHtml = segmentsToHtml(card);
+  const numbers = Object.fromEntries(flaggedSegments(card).map((f, idx) => [f.key, idx + 1]));
+  const messages = cardMessages(card);
   if (card.kind === 'call') {
     return '<div class="call-screen">' +
       '<div class="call-avatar">' + ICONS.caller + '</div>' +
       '<p class="call-name">' + escapeHtml(card.sender) + '</p>' +
       '<p class="call-meta">Spoofed caller ID · 03:42</p>' +
       '<div class="call-live"><span class="pulse-dot"></span>Live captions</div>' +
-      '<div class="caption-box">' + bubbleHtml + '</div>' +
+      '<div class="caption-box">' + segmentsToHtml(card, 0, messages[0].segments, numbers) + '</div>' +
     '</div>';
   }
-  return '<div class="msg-row"><div class="avatar">' + ICONS.person + '</div><div class="bubble">' + bubbleHtml + '</div></div>';
+  return '<div class="thread">' + messages.map((msg, m) => {
+    if (msg.divider) return '<p class="thread-divider">' + escapeHtml(msg.divider) + '</p>';
+    const bubbleHtml = segmentsToHtml(card, m, msg.segments, numbers);
+    return msg.from === 'you'
+      ? '<div class="msg-row you"><div class="bubble you">' + bubbleHtml + '</div></div>'
+      : '<div class="msg-row"><div class="avatar">' + ICONS.person + '</div><div class="bubble">' + bubbleHtml + '</div></div>';
+  }).join('') + '</div>';
 }
 
 function renderGallery(){
@@ -102,21 +184,19 @@ function renderGallery(){
     const el = document.createElement('div');
     el.className = 'scam-card reveal';
 
-    const legendHtml = card.segments.map((seg, i) => ({ seg, i }))
-      .filter(x => x.seg.reason)
-      .map((x, idx) => (
-        '<div class="legend-item" id="' + card.id + '-' + x.i + '-row">' +
-          '<span class="legend-num">' + (idx + 1) + '</span>' +
-          '<p class="legend-text">' + escapeHtml(x.seg.reason) + '</p>' +
-        '</div>'
-      )).join('');
+    const legendHtml = flaggedSegments(card).map((flag, idx) => (
+      '<div class="legend-item" id="' + flag.key + '-row">' +
+        '<span class="legend-num">' + (idx + 1) + '</span>' +
+        '<p class="legend-text">' + escapeHtml(flag.reason) + '</p>' +
+      '</div>'
+    )).join('');
 
     el.innerHTML =
       '<span class="scam-title">' + escapeHtml(card.title) + '</span>' +
       (card.photo ? '<img class="scam-photo" src="' + card.photo + '" alt="' + escapeHtml(card.title) + ' example" loading="lazy">' : '') +
       '<div class="device">' + deviceChrome(card) + '<div class="device-body">' + deviceBody(card) + '</div></div>' +
       '<div class="legend">' + legendHtml + '</div>' +
-      '<a class="try-btn" href="/secondscan?example=' + encodeURIComponent(card.segments.map(s => s.text).join('')) + '">Test this in the scanner</a>';
+      '<a class="try-btn" href="/secondscan?example=' + encodeURIComponent(scammerText(card)) + '">Test this in the scanner</a>';
 
     gallery.appendChild(el);
   });
