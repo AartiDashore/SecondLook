@@ -9,6 +9,7 @@ import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from signals import detect_signals, contains_link, requests_install
@@ -500,6 +501,9 @@ async def get_languages():
 BASE_DIR = Path(__file__).parent
 SECOND_LOOK_PATH = BASE_DIR / "prototype.html"
 TELLSIGN_PATH = BASE_DIR / "tellsign.html"
+
+# Tellsign's stylesheet and script (static/tellsign.css, static/tellsign.js).
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
 @app.get("/", response_class=HTMLResponse)

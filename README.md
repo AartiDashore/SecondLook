@@ -51,7 +51,8 @@ Then open http://127.0.0.1:8000 (Second Look) and http://127.0.0.1:8000/tellsign
 
 ## Files
 - `prototype.html`: Second Look prototype (served at `/`)
-- `tellsign.html`: Tellsign front end (served at `/tellsign`)
+- `tellsign.html`: Tellsign page markup (served at `/tellsign`)
+- `static/tellsign.css`, `static/tellsign.js`: Tellsign styles and script (served at `/static/`)
 - `app.py`: FastAPI app and Tellsign API
 - `signals.py`: the rule-based scam signals
 - `supabase/schema.sql`: the `scans` table the API reads and writes
