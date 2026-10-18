@@ -23,6 +23,9 @@ REFUSAL_FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+# Supabase is optional: without it scans still work, but nothing is logged, so
+# history, stats, feedback and known-scam matching are off.
+SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_KEY)
 
 # Reads ANTHROPIC_API_KEY from the environment. Short timeout and one retry keep a
 # slow call well inside Vercel's function time limit; the rule engine covers failures.
@@ -333,9 +336,14 @@ def finalize_scan(input_type: str, message_text: str, language: str, reading_lev
     degraded = result.pop("_degraded", False)
     result.pop("_error", None)
 
-    row_id = log_scan(input_type, message_text, result, model_used, language, degraded)
-    normalized = normalize_text(message_text)
-    known_matches = count_known_matches(normalized, exclude_id=row_id)
+    row_id, known_matches = None, 0
+    if SUPABASE_ENABLED:
+        # A database problem should never stop someone getting their scam verdict.
+        try:
+            row_id = log_scan(input_type, message_text, result, model_used, language, degraded)
+            known_matches = count_known_matches(normalize_text(message_text), exclude_id=row_id)
+        except requests.RequestException as e:
+            print(f"Supabase unavailable, scan not logged: {e}")
 
     return {
         "id": row_id,
@@ -385,12 +393,15 @@ async def scan_image(req: ImageScanRequest):
 
 @app.post("/api/feedback")
 async def feedback(scan_id: int = Form(...), was_correct: str = Form(...)):
-    sb_update("scans", {"id": scan_id}, {"feedback": was_correct})
+    if SUPABASE_ENABLED:
+        sb_update("scans", {"id": scan_id}, {"feedback": was_correct})
     return {"ok": True}
 
 
 @app.get("/api/log")
 async def get_log():
+    if not SUPABASE_ENABLED:
+        return []
     rows = sb_select(
         "scans",
         {
@@ -404,7 +415,7 @@ async def get_log():
 
 @app.get("/api/stats")
 async def get_stats():
-    rows = sb_select("scans", {"select": "verdict"})
+    rows = sb_select("scans", {"select": "verdict"}) if SUPABASE_ENABLED else []
     danger_count = sum(1 for r in rows if r["verdict"] == "danger")
     caution_count = sum(1 for r in rows if r["verdict"] == "caution")
     return {

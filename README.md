@@ -35,9 +35,11 @@ Supabase for the scan log, plain HTML/CSS/JS front end, deployed on Vercel.
 
 ## Setup
 
-1. Create a Supabase project and run `supabase/schema.sql` in its SQL Editor.
-2. Copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY` (from console.anthropic.com), `SUPABASE_URL` and `SUPABASE_KEY`
-   (use the server-side `service_role` key; it never reaches the browser).
+1. Copy `.env.example` to `.env` and fill in `ANTHROPIC_API_KEY` (from console.anthropic.com). `.env` is
+   git-ignored, so keys stay on your machine; on Vercel, set the same names under Environment Variables.
+2. Optional, for scan history, stats, feedback and known-scam matching: create a Supabase project, run
+   `supabase/schema.sql` in its SQL Editor, and set `SUPABASE_URL` and `SUPABASE_KEY` (the server-side
+   `service_role` key; it never reaches the browser). Without them, scanning still works.
 
 ## Run it locally
 ```bash
