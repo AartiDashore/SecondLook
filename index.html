@@ -36,40 +36,17 @@
       <h2 class="section-title">3 risk factors</h2>
       <p class="section-sub">Here’s what stood out about this transaction.</p>
 
-      <ul class="risks">
-        <li>
-          <span class="risk-icon">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 8v8M12 8v8M15 8v8"/></svg>
-          </span>
-          <div>
-            <strong>Increasing payments</strong>
-            <p>3 payments to the same recipient, each larger than the last.</p>
-          </div>
-        </li>
-        <li>
-          <span class="risk-icon bold">3×</span>
-          <div>
-            <strong>Higher than your usual total</strong>
-            <p>Total sent to this recipient is 3× your usual baseline.</p>
-          </div>
-        </li>
-        <li>
-          <span class="risk-icon">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4 3 20h18L12 4z"/><path d="M12 10v4"/></svg>
-          </span>
-          <div>
-            <strong>New recipient</strong>
-            <p>This recipient was added less than 30 days ago.</p>
-          </div>
-        </li>
+      <ul class="risks" id="riskList">
       </ul>
     </section>
 
+    <button class="btn primary" id="contactBtn">Contact a representative</button>
+    <br>
+    <button class="btn secondary" id="thinkBtn">Take another look</button>
+
     <footer class="actions">
-      <button class="btn primary" id="contactBtn">Contact a representative</button>
-      <button class="btn secondary" id="thinkBtn">Let me think about it</button>
-      <button class="btn link" id="continueBtn">Continue with transaction <span aria-hidden="true">&rarr;</span></button>
-      <div class="home-indicator"></div>
+      <button class="btn cancel" id="cancelBtn"><span class="arrow" aria-hidden="true">&larr;</span> Cancel</button>
+      <button class="btn continue" id="continueBtn">Continue <span class="arrow" aria-hidden="true">&rarr;</span></button>
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
