@@ -10,10 +10,13 @@ const ICONS = {
 // Most common first, from 2025 FTC (US) and I4C (India) data: bank/government impersonation
 // is the most reported scam; investment scams, which the 'wrong number' romance leads to, cause
 // the biggest losses; romance scam losses are rising; digital arrest complaints are falling.
+// Photos live in static/img, resized for the cards; romance.jpg and wrong-number.jpg are CC0
+// public domain, from StockSnap.
 const GALLERY = [
   {
     id: 'bank', kind: 'sms', title: 'Fake KYC / account-block alert', sender: 'AD-ALERTS',
-    photo: 'https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_202924_4d3c30f4-1b90-43e6-9cbc-7a46a2d6504d.png',
+    teaser: "“Your account will be blocked within 24 hours… share your OTP and account number.”",
+    photo: '/static/img/bank.jpg',
     segments: [
       { text: "Dear Customer, " },
       { text: "your account will be blocked within 24 hours", reason: "Real banks don't threaten to block your account by text within hours — this urgency is designed to stop you thinking clearly." },
@@ -24,6 +27,8 @@ const GALLERY = [
   },
   {
     id: 'wrongnumber', kind: 'sms', title: '"Wrong number" text that turns into romance', sender: 'Unknown number',
+    teaser: "“Sorry, wrong number!” Three weeks later: “I've made thousands trading crypto. Just send $500 to start.”",
+    photo: '/static/img/wrong-number.jpg',
     messages: [
       { from: 'them', segments: [
         { text: "Mary, it's Janey! Are you ready for the class reunion tomorrow?", reason: "Scammers text random numbers with a believable 'wrong number' message, hoping a polite reply starts a conversation." }
@@ -45,6 +50,8 @@ const GALLERY = [
   },
   {
     id: 'romance', kind: 'dating', title: 'Romance scam: the sudden emergency', sender: 'Tom · 83 miles away',
+    teaser: "“My car broke down and the repair is $1,200. Could you send it as gift cards?”",
+    photo: '/static/img/romance.jpg',
     messages: [
       { from: 'them', segments: [
         { text: "I know we only matched last week, but " },
@@ -68,7 +75,8 @@ const GALLERY = [
   },
   {
     id: 'delivery', kind: 'sms', title: 'Fake courier / customs fee', sender: 'VK-COURIER',
-    photo: 'https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_202934_735bfb7e-76d9-4a49-bb57-7ea7fb4e7088.png',
+    teaser: "“Pay a refundable processing fee of Rs 199 within 1 hour to release your delivery.”",
+    photo: '/static/img/delivery.jpg',
     segments: [
       { text: "Your parcel is held at customs. " },
       { text: "Pay a refundable processing fee of Rs 199 within 1 hour", reason: "Customs and courier fees are never collected through a text link, and a genuinely 'refundable' fee wouldn't need to be paid under a deadline." },
@@ -78,7 +86,8 @@ const GALLERY = [
   },
   {
     id: 'job', kind: 'whatsapp', title: 'Fake part-time job offer', sender: 'Unknown number',
-    photo: 'https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_203222_f841adc0-2f3c-45ee-9433-89532a609667.png',
+    teaser: "“Earn Rs 5000/day! A registration fee of Rs 499 confirms your slot.”",
+    photo: '/static/img/job.jpg',
     segments: [
       { text: "Congratulations! " },
       { text: "You've been selected for a part-time job earning Rs 5000/day", reason: "A job that pays far above market rate for no stated skill or interview is the classic hook of a job scam." },
@@ -90,7 +99,8 @@ const GALLERY = [
   },
   {
     id: 'arrest', kind: 'call', title: '"Digital arrest" impersonation call', sender: 'Unknown Caller',
-    photo: 'https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_202939_15581caa-b383-4bef-acee-57616d1570d5.png',
+    teaser: "“You are under digital arrest. Stay on this video call and do not tell anyone.”",
+    photo: '/static/img/arrest.jpg',
     segments: [
       { text: "This is an officer from the Cyber Crime Cell. " },
       { text: "Your Aadhaar number has been used in a money laundering case", reason: "Impersonating a police or government body by phone is a fast way to borrow authority and trigger fear before you can verify anything." },
@@ -101,6 +111,13 @@ const GALLERY = [
     ]
   }
 ];
+
+const CHANNELS = {
+  sms: ['Text message', ICONS.sms],
+  whatsapp: ['WhatsApp', ICONS.chat],
+  dating: ['Dating app', ICONS.heart],
+  call: ['Phone call', ICONS.phone],
+};
 
 function escapeHtml(str){
   return str.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -130,12 +147,6 @@ function segmentsToHtml(card, m, segments, numbers){
     return '<span class="flag" tabindex="0" role="button" data-card="' + card.id + '" data-legend="' + key + '">' +
       escapeHtml(seg.text) + '<sup>' + numbers[key] + '</sup></span>';
   }).join('');
-}
-
-// What "Test this in the scanner" pastes in: everything the scammer wrote.
-function scammerText(card){
-  return cardMessages(card).filter(msg => msg.from === 'them')
-    .map(msg => msg.segments.map(s => s.text).join('')).join('\n');
 }
 
 function deviceChrome(card){
@@ -181,22 +192,38 @@ function renderGallery(){
   gallery.innerHTML = '';
 
   GALLERY.forEach(card => {
-    const el = document.createElement('div');
+    const el = document.createElement('article');
     el.className = 'scam-card reveal';
 
-    const legendHtml = flaggedSegments(card).map((flag, idx) => (
+    const flags = flaggedSegments(card);
+    const legendHtml = flags.map((flag, idx) => (
       '<div class="legend-item" id="' + flag.key + '-row">' +
         '<span class="legend-num">' + (idx + 1) + '</span>' +
         '<p class="legend-text">' + escapeHtml(flag.reason) + '</p>' +
       '</div>'
     )).join('');
+    const [channel, channelIcon] = CHANNELS[card.kind];
 
     el.innerHTML =
-      '<span class="scam-title">' + escapeHtml(card.title) + '</span>' +
-      (card.photo ? '<img class="scam-photo" src="' + card.photo + '" alt="' + escapeHtml(card.title) + ' example" loading="lazy">' : '') +
-      '<div class="device">' + deviceChrome(card) + '<div class="device-body">' + deviceBody(card) + '</div></div>' +
-      '<div class="legend">' + legendHtml + '</div>' +
-      '<a class="try-btn" href="/secondscan?example=' + encodeURIComponent(scammerText(card)) + '">Test this in the scanner</a>';
+      '<div class="scam-cover">' +
+        '<img src="' + card.photo + '" alt="" loading="lazy">' +
+        '<span class="scam-channel">' + channelIcon + escapeHtml(channel) + '</span>' +
+      '</div>' +
+      '<div class="scam-body">' +
+        '<h2 class="scam-title">' + escapeHtml(card.title) + '</h2>' +
+        '<p class="scam-teaser">' + escapeHtml(card.teaser) + '</p>' +
+      '</div>' +
+      '<details class="scam-more">' +
+        '<summary>' +
+          '<span class="more-closed">Learn more</span><span class="more-open">Show less</span>' +
+          '<span class="more-count">' + flags.length + ' red flags</span>' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>' +
+        '</summary>' +
+        '<div class="scam-full">' +
+          '<div class="device">' + deviceChrome(card) + '<div class="device-body">' + deviceBody(card) + '</div></div>' +
+          '<div class="legend">' + legendHtml + '</div>' +
+        '</div>' +
+      '</details>';
 
     gallery.appendChild(el);
   });
@@ -208,6 +235,9 @@ function renderGallery(){
       row.classList.add('pulse');
       row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       setTimeout(() => row.classList.remove('pulse'), 1400);
+    });
+    flag.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flag.click(); }
     });
   });
 }

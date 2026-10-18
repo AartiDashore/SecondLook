@@ -571,13 +571,3 @@ input.addEventListener('keydown', (e) => {
 });
 
 loadLanguages().then(() => loadUiStrings(currentLanguage));
-
-// "Test this in the scanner" on the patterns page links here with ?example=<message text>.
-const exampleText = new URLSearchParams(location.search).get('example');
-if (exampleText) {
-  tabTextBtn.click();
-  input.value = exampleText;
-  history.replaceState(null, '', location.pathname);
-  document.querySelector('.console').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  input.focus();
-}
