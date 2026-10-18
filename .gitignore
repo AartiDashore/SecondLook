@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+*.db
+server.log
+.vercel
+.venv/
+.DS_Store

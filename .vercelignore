@@ -1,0 +1,6 @@
+analysis/
+deck/
+screenshots/
+test-samples/
+.venv/
+.env
