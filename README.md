@@ -49,6 +49,8 @@ uvicorn app:app --reload
 ```
 Then open http://127.0.0.1:8000 (Second Look) and http://127.0.0.1:8000/tellsign (Tellsign).
 
+`--reload` restarts the server whenever you save `app.py`. Edits to `tellsign.html` or the files in `static/` only need a browser refresh (Cmd+Shift+R if the old CSS/JS is cached).
+
 ## Files
 - `prototype.html`: Second Look prototype (served at `/`)
 - `tellsign.html`: Tellsign page markup (served at `/tellsign`)
