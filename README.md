@@ -1,11 +1,12 @@
 # Second Look (HuskyHack 2026)
 
-This repo deploys as one Vercel project with two pages:
+This repo deploys as one Vercel project with these pages:
 
 | Route | What it is |
 |---|---|
 | `/` | **Second Look** prototype (`prototype.html`): a pause the member controls |
 | `/secondscan` | **SecondScan** scam scanner (`secondscan.html`), backed by the FastAPI API in `app.py` |
+| `/secondscan/patterns` | SecondScan's common scam patterns page (`patterns.html`) |
 | `/api/*` | SecondScan API (`/api/scan`, `/api/scan-image`, `/api/feedback`, `/api/stats`, `/api/log`, `/api/languages`, `/api/ui-strings`) |
 
 `analysis/` (offline scoring script and synthetic data) and `deck/` (presentation slides) are not deployed.
@@ -49,12 +50,14 @@ uvicorn app:app --reload
 ```
 Then open http://127.0.0.1:8000 (Second Look) and http://127.0.0.1:8000/secondscan (SecondScan).
 
-`--reload` restarts the server whenever you save `app.py`. Edits to `secondscan.html` or the files in `static/` only need a browser refresh (Cmd+Shift+R if the old CSS/JS is cached).
+`--reload` restarts the server whenever you save `app.py`. Edits to the `.html` pages or the files in `static/` only need a browser refresh (Cmd+Shift+R if the old CSS/JS is cached).
 
 ## Files
 - `prototype.html`: Second Look prototype (served at `/`)
 - `secondscan.html`: SecondScan page markup (served at `/secondscan`)
+- `patterns.html`: common scam patterns page (served at `/secondscan/patterns`)
 - `static/secondscan.css`, `static/secondscan.js`: SecondScan styles and script (served at `/static/`)
+- `static/patterns.css`, `static/patterns.js`: patterns page styles and the example gallery
 - `app.py`: FastAPI app and SecondScan API
 - `signals.py`: the rule-based scam signals
 - `supabase/schema.sql`: the `scans` table the API reads and writes

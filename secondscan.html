@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SecondScan — you're protected</title>
+<title>SecondScan — check a suspicious message</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/secondscan.css">
@@ -24,16 +24,14 @@
     <div class="privacy-note">Messages are analyzed by AI and saved only to your local scan history.<br>Never shared elsewhere.</div>
   </div>
 
-  <div class="hero-photo">
-    <img src="https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_204734_a04ff2bb-1532-4367-8d2d-6edbce82b6c4.png" alt="Family checking a message together, staying safe from scams" loading="lazy">
-    <div class="hero-photo-content">
-      <div class="hero-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 2 L20 5 V11 C20 16.5 16.5 20.5 12 22 C7.5 20.5 4 16.5 4 11 V5 Z"/></svg>
-        AI-powered scam guardian
-      </div>
-      <h1>Consider yourself protected.</h1>
-      <p class="sub">SecondScan stands between you and every message trying to trick you — reading it the way a scam actually reads, and telling you in seconds what's real and what's a trap.</p>
-    </div>
+  <nav class="page-tabs" aria-label="SecondScan pages">
+    <a class="page-tab" href="/secondscan" aria-current="page">Scan a message</a>
+    <a class="page-tab" href="/secondscan/patterns">Learn about common scam patterns</a>
+  </nav>
+
+  <div class="intro">
+    <h1>Is this message a scam?</h1>
+    <p class="sub">Paste a message or upload a screenshot. SecondScan's AI checks it for common scam tactics (pressure to act fast, requests for an OTP or payment, impersonation, disguised links) and tells you in plain language whether it's likely a scam, which phrases gave it away, and what to do next.</p>
   </div>
 
 </div>
@@ -41,13 +39,6 @@
 
 <section class="band band-primary">
 <div class="wrap">
-
-  <div class="showcase">
-    <div class="showcase-grid">
-      <img src="https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_204207_dc57ef01-740a-4199-9b53-8102f4ad1021.png" alt="SecondScan scanner interface preview" loading="lazy">
-      <img src="https://d8j0ntlcm91z4.cloudfront.net/user_38HhQhbOAlRVssHeu2gMBnp2AGw/hf_20260904_204212_f5dbd4ed-7057-4b42-8cc2-668cdd096264.png" alt="SecondScan screenshot upload interface preview" loading="lazy">
-    </div>
-  </div>
 
   <div class="stat-band">
     <div class="stat">
@@ -152,23 +143,6 @@
     <p class="history-head" id="historyHeadLabel">Recent scans</p>
     <div id="historyList" class="history-empty">No scans yet.</div>
   </div>
-
-</div>
-</section>
-
-<section class="band band-examples">
-<div class="wrap">
-
-  <div class="gallery-head">
-    <span class="examples-badge">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-      Learn the patterns
-    </span>
-    <h2>What scams actually look like</h2>
-    <p>Four real patterns circulating in India right now, shown where they actually show up. Tap the underlined phrases to see why each one is a red flag.</p>
-  </div>
-
-  <div class="gallery" id="gallery"></div>
 
 </div>
 </section>

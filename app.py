@@ -501,8 +501,9 @@ async def get_languages():
 BASE_DIR = Path(__file__).parent
 SECOND_LOOK_PATH = BASE_DIR / "prototype.html"
 SECONDSCAN_PATH = BASE_DIR / "secondscan.html"
+PATTERNS_PATH = BASE_DIR / "patterns.html"
 
-# SecondScan's stylesheet and script (static/secondscan.css, static/secondscan.js).
+# SecondScan's stylesheets and scripts (static/secondscan.*, static/patterns.*).
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 
@@ -514,3 +515,8 @@ async def index():
 @app.get("/secondscan", response_class=HTMLResponse)
 async def secondscan():
     return SECONDSCAN_PATH.read_text(encoding="utf-8")
+
+
+@app.get("/secondscan/patterns", response_class=HTMLResponse)
+async def patterns():
+    return PATTERNS_PATH.read_text(encoding="utf-8")
