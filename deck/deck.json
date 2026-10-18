@@ -1,1 +1,21 @@
-{"v": 4, "createdOnFiles": {"v": 1, "at": "2026-10-17T12:00:00Z"}, "lists": "css", "title": "Second Look: HuskyHack Phase 2 deck", "order": ["cover", "problem", "linda", "trigger", "ladder", "channel", "new", "evidence", "paths", "pilot", "measures"], "sections": {"s1": {"description": "Problem and trigger", "start": "cover"}, "s2": {"description": "Evidence, paths and pilot", "start": "evidence"}}, "cover": "cover", "faces": {"atkinson-hyperlegible": {"family": "Atkinson Hyperlegible", "href": "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap"}}, "designSystems": []}
+{
+    "v": 4,
+    "createdOnFiles": {
+        "v": 1,
+        "at": "2026-10-17T12:00:00Z"
+    },
+    "lists": "css",
+    "title": "Second Look: HuskyHack Phase 2 deck",
+    "order": ["cover", "problem", "linda", "trigger", "ladder", "channel", "new", "evidence", "paths", "pilot", "measures"],
+    "sections": {
+        "s1": {"description": "Problem and trigger", "start": "cover"},
+        "s2": {"description": "Evidence, paths and pilot", "start": "evidence"}},
+        "cover": "cover",
+        "faces": {
+            "atkinson-hyperlegible": {
+                "family": "Atkinson Hyperlegible",
+                "href": "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap"
+            }
+        },
+        "designSystems": []
+    }
