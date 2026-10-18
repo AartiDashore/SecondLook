@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Second Look (HuskyHack 2026)
 
 - prototype.html: clickable demo. Double-click to open in any browser. No install.
@@ -6,3 +7,6 @@
 - deck/: Slides source (deck.json plus slides/*.html, 1920x1080 inline-styled). View it in the published deck link, or paste into a Slides artifact.
 
 Note: the "Evidence" numbers for look-alikes after Planned Moment come from a short follow-up calculation (subtract 25 points for home-closing, vehicle-cash and contractor look-alikes) that is not in this script.
+=======
+# SecondLook
+>>>>>>> d776b995235645a5ffcf6b815ee8037e185f4989
