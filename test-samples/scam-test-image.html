@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #e5e5ea; display: flex; justify-content: center; padding: 40px; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .phone {
+    width: 380px; background: #fff; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+  .status-bar { background: #f6f6f6; padding: 10px 16px; font-size: 12px; color: #333; display: flex; justify-content: space-between; }
+  .header { background: #f6f6f6; padding: 8px 16px 12px; text-align: center; border-bottom: 1px solid #ddd; }
+  .header .sender { font-weight: 600; font-size: 15px; }
+  .header .sub { font-size: 11px; color: #888; }
+  .messages { padding: 20px 14px; background: #fff; min-height: 200px; }
+  .bubble {
+    background: #e9e9eb; color: #111; padding: 12px 14px; border-radius: 18px;
+    font-size: 15px; line-height: 1.4; max-width: 90%; margin-bottom: 8px;
+  }
+  .time { font-size: 11px; color: #999; text-align: center; margin: 10px 0; }
+  .link { color: #0066cc; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <div class="status-bar"><span>9:41 AM</span><span>🔋 100%</span></div>
+    <div class="header">
+      <div class="sender">SecureTrust Bank</div>
+      <div class="sub">+1 (800) 555-0199</div>
+    </div>
+    <div class="messages">
+      <div class="time">Today 9:40 AM</div>
+      <div class="bubble">
+        ALERT: Your SecureTrust account has been temporarily suspended due to unusual activity. You must verify your identity within 24 hours or your account will be permanently closed.<br><br>
+        Verify now: <span class="link">securetrust-verify.bit.ly/acct8821</span><br><br>
+        Enter your online banking PIN and OTP on the verification page to restore access immediately.
+      </div>
+    </div>
+  </div>
+</body>
+</html>

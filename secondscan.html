@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SecondScan — check a suspicious message</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/secondscan.css">
+</head>
+<body>
+
+<section class="band band-hero">
+<div class="wrap">
+
+  <div class="topline">
+    <div class="wordmark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" style="color:var(--gold)">
+        <path d="M12 2 L20 5 V11 C20 16.5 16.5 20.5 12 22 C7.5 20.5 4 16.5 4 11 V5 Z"/>
+        <path d="M9 11.5 L11 13.5 L15.5 9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="wordmark-text">Second<span>Scan</span></span>
+    </div>
+    <div class="privacy-note">Messages are analyzed by AI and saved only to your local scan history.<br>Never shared elsewhere.</div>
+  </div>
+
+  <nav class="page-tabs" aria-label="SecondScan pages">
+    <a class="page-tab" href="/secondscan" aria-current="page">Scan a message</a>
+    <a class="page-tab" href="/secondscan/patterns">Learn about common scam patterns</a>
+  </nav>
+
+  <div class="intro">
+    <h1>Is this message a scam?</h1>
+    <p class="sub">Paste a message or upload a screenshot. SecondScan's AI checks it for common scam tactics (pressure to act fast, requests for an OTP or payment, impersonation, disguised links) and tells you in plain language whether it's likely a scam, which phrases gave it away, and what to do next.</p>
+  </div>
+
+</div>
+</section>
+
+<section class="band band-primary">
+<div class="wrap">
+
+  <div class="console">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabTextBtn">Paste text</button>
+      <button class="tab-btn" id="tabImageBtn">Upload screenshot</button>
+      <button class="tab-btn" id="tabPhoneBtn">Phone number scan</button>
+    </div>
+
+    <div class="settings-row">
+      <label class="settings-field">
+        <span class="settings-label">Language</span>
+        <select id="langSelect"></select>
+      </label>
+      <label class="settings-toggle">
+        <input type="checkbox" id="simpleModeToggle">
+        <span id="simpleModeLabel">Explain simply</span>
+      </label>
+    </div>
+
+    <div class="tab-panel active" id="tabTextPanel">
+      <textarea id="input" placeholder="Paste the suspicious message here…"></textarea>
+      <div class="console-footer">
+        <div class="examples">
+          <button class="example-chip" data-ex="bank">Try: bank alert</button>
+          <button class="example-chip" data-ex="delivery">Try: delivery link</button>
+          <button class="example-chip" data-ex="job">Try: job offer</button>
+          <button class="example-chip" data-ex="safe">Try: a normal text</button>
+        </div>
+        <button class="scan" id="scanBtn">Scan message</button>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tabImagePanel">
+      <div class="dropzone" id="dropzone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <p class="dropzone-text"><b>Drop a screenshot here</b> or tap to browse</p>
+        <p class="dropzone-sub">PNG or JPG · SMS, WhatsApp, email, or call screen</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none;" />
+      <div id="imagePreviewWrap" style="display:none; margin-top:12px;">
+        <img id="imagePreview" class="preview-thumb" alt="Uploaded screenshot preview" />
+        <br><button class="clear-image" id="clearImageBtn">Remove image</button>
+      </div>
+      <div class="console-footer">
+        <span style="font-size:12.5px; color:rgba(200,225,250,0.62);">We read the image and check it — nothing is shared externally.</span>
+        <button class="scan" id="scanImageBtn" disabled>Scan screenshot</button>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tabPhonePanel">
+      <input type="tel" id="phoneInput" class="phone-input" placeholder="Phone number, e.g. (206) 555-0123" autocomplete="off" inputmode="tel" aria-label="Phone number">
+      <textarea id="phoneContext" class="phone-context" placeholder="Optional: what did they say or ask for?" aria-label="What the caller or texter said"></textarea>
+      <div class="console-footer">
+        <span class="phone-hint" id="phoneHint">US numbers work without +1. For other countries, start with + and the country code. The number's owner is never contacted.</span>
+        <button class="scan" id="scanPhoneBtn">Scan number</button>
+      </div>
+    </div>
+
+    <div class="scan-progress" id="progress"><div class="scan-progress-bar"></div></div>
+  </div>
+
+  <div class="result" id="result">
+    <div id="degradedBanner"></div>
+    <div id="knownMatchBanner"></div>
+
+    <div class="verdict" id="verdict">
+      <div class="verdict-icon" id="verdictIcon"></div>
+      <div class="verdict-text">
+        <p class="verdict-label" id="verdictLabel">—</p>
+        <p class="verdict-meta" id="verdictMeta">—</p>
+      </div>
+      <button class="read-aloud-btn" id="readAloudBtn">🔊 <span id="readAloudLabel">Read aloud</span></button>
+    </div>
+    <div id="phoneDetails"></div>
+    <p class="findings-head" id="findingsHead">What we found</p>
+    <div id="findings"></div>
+
+    <div class="action-box" id="actionBox" style="display:none;">
+      <p class="action-head" id="actionHead">What to do</p>
+      <p id="actionText"></p>
+    </div>
+
+    <div id="safetyBox"></div>
+
+    <div class="feedback-row">
+      <span id="feedbackQLabel">Was this right?</span>
+      <button class="fb-btn" id="fbYes">Yes</button>
+      <button class="fb-btn" id="fbNo">No</button>
+      <span class="fb-thanks" id="fbThanks"></span>
+    </div>
+
+    <button class="rescan" id="rescanBtn">Scan another message</button>
+  </div>
+
+  <div class="history">
+    <div id="protectedBadgeWrap"></div>
+    <p class="history-head" id="historyHeadLabel">Recent scans</p>
+    <div id="historyList" class="history-empty">No scans yet.</div>
+  </div>
+
+</div>
+</section>
+
+<section class="band band-footer">
+<div class="wrap">
+
+  <footer>
+    SecondScan flags patterns common to scams — pressure tactics, impersonation, payment requests, suspicious links. It doesn't read your mind or the sender's. When in doubt, verify directly with the person or organisation through a number or site you already trust, not one in the message itself.
+  </footer>
+
+</div>
+</section>
+
+<script src="/static/secondscan.js"></script>
+
+</body>
+</html>

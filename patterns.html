@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Common scam patterns — SecondScan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/secondscan.css">
+<link rel="stylesheet" href="/static/patterns.css">
+</head>
+<body>
+
+<section class="band band-patterns">
+<div class="wrap">
+
+  <div class="topline">
+    <div class="wordmark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" style="color:var(--gold)">
+        <path d="M12 2 L20 5 V11 C20 16.5 16.5 20.5 12 22 C7.5 20.5 4 16.5 4 11 V5 Z"/>
+        <path d="M9 11.5 L11 13.5 L15.5 9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="wordmark-text">Second<span>Scan</span></span>
+    </div>
+  </div>
+
+  <nav class="page-tabs" aria-label="SecondScan pages">
+    <a class="page-tab" href="/secondscan">Scan a message</a>
+    <a class="page-tab" href="/secondscan/patterns" aria-current="page">Learn about common scam patterns</a>
+  </nav>
+
+  <div class="gallery-head">
+    <span class="examples-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+      Learn the patterns
+    </span>
+    <h1>What scams actually look like</h1>
+    <p>Six real patterns circulating right now, most common first. Open any card to see the full conversation and why each phrase is a red flag.</p>
+  </div>
+
+  <div class="gallery" id="gallery"></div>
+
+  <section class="scan-cta" aria-labelledby="scanCtaTitle">
+    <span class="scan-cta-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L20 5 V11 C20 16.5 16.5 20.5 12 22 C7.5 20.5 4 16.5 4 11 V5 Z"/><path d="M9 11.5 L11 13.5 L15.5 9"/></svg>
+    </span>
+    <h2 id="scanCtaTitle">Think you're being scammed?</h2>
+    <p>Whether something suspicious just arrived or you've already replied, check it before you do anything else. Paste the message, upload a screenshot, or look up the number, and SecondScan tells you in seconds whether it's a scam and what to do next.</p>
+    <a class="scan-cta-btn" href="/secondscan">
+      Scan your message
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+    </a>
+    <p class="scan-cta-note">Already sent money or a code? Scan it anyway to see what to do right now and who to report it to.</p>
+  </section>
+
+</div>
+</section>
+
+<section class="band band-footer">
+<div class="wrap">
+
+  <footer>
+    SecondScan flags patterns common to scams — pressure tactics, impersonation, payment requests, suspicious links. It doesn't read your mind or the sender's. When in doubt, verify directly with the person or organisation through a number or site you already trust, not one in the message itself.
+  </footer>
+
+</div>
+</section>
+
+<script src="/static/patterns.js"></script>
+
+</body>
+</html>
