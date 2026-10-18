@@ -86,3 +86,11 @@ python -m unittest discover -s analysis/tests -v
 npm test
 python analysis/validate_scoring.py
 ```
+
+## Romance scam comic
+
+This six-frame storyboard follows a member reviewing a $500 P2P payment to someone impersonating Ryan Gosling. She uses Second Look to review a WhatsApp screenshot, considers the transaction risk factors, chooses “Let me think about it,” and cancels the payment before questioning the request on WhatsApp.
+
+![Six-frame comic showing a woman using Second Look to review a suspicious payment, cancel it without sending money, and question a celebrity impersonator on WhatsApp.](docs/images/second-look-romance-scam-comic.png)
+
+The comic uses the supplied Sound Credit Union interface design. Any score shown in the storyboard is illustrative artwork and is not used by the live M1002 demo, which always loads its confidence percentage from the Python scoring API. The scoring scales are described in [DESIGN.md](DESIGN.md).
